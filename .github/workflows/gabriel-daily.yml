@@ -5,26 +5,27 @@ on:
     - cron: '0 13 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   gabriel-daily:
     name: Gabriel Daily Run
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install
         run: npm ci
 
-      - name: Run Gabriel daily sequence
+      - name: Run
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -44,18 +45,10 @@ jobs:
           AGENTMAIL_INBOX_ID: ${{ secrets.AGENTMAIL_INBOX_ID }}
         run: npm run gabriel:daily
 
-      - name: Upload daily output artifacts
+      - name: Save outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gabriel-daily-${{ github.run_id }}
+          name: gabriel-${{ github.run_id }}
           path: automation-os/data/
           retention-days: 30
-
-      - name: Notify failure via Telegram
-        if: failure()
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="GABRIEL DAILY RUN FAILED $(date '+%Y-%m-%d') Check GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -d parse_mode="HTML"
