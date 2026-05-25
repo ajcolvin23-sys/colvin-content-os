@@ -1,6 +1,14 @@
 ---
 name: paper-design-system
-description: Use this skill when Gabriel needs to design or improve a landing page layout, create a component variation, define page structure, or generate design system decisions using Paper.design.
+status: DEPRECATED
+replaced_by: design-system-workflow
+deprecated_date: 2026-05-25
+reason: Replaced with tool-agnostic design-system-workflow skill. Paper.design moved to Level 2 (paid/optional). Free alternatives (React/Tailwind spec, Penpot) now cover all use cases.
+---
+
+> **DEPRECATED** — Do not load this skill. Use `design-system-workflow` instead.
+> This folder is kept for historical reference only.
+
 ---
 
 # Purpose
@@ -18,7 +26,7 @@ Paper Design System handles all visual and structural decisions for Alfred's lan
 # When Not To Use
 
 - Writing the copy (use `website-cro` or `content-engine`)
-- Setting up an A/B test (use `humblytics-experiment`)
+- Setting up an A/B test (use `experiment-platform-workflow`)
 - Publishing the content (use `gabriel-cms`)
 
 # Required Inputs

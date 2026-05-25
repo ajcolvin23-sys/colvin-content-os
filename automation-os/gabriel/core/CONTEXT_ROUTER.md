@@ -18,6 +18,8 @@ Before loading any skill, answer these 7 questions internally:
 
 ## Skill Routing Table
 
+### Website & Content (Original Skills)
+
 | Task Type | Load This Skill |
 |---|---|
 | Create, edit, schedule, or version website content | `skills/gabriel-cms` |
@@ -29,11 +31,44 @@ Before loading any skill, answer these 7 questions internally:
 | Review anything before it goes live | `skills/qa-publish-guard` |
 | Review performance data, update memory, or improve a workflow | `skills/analytics-learning-loop` |
 
+### Research & Intelligence
+
+| Task Type | Load This Skill |
+|---|---|
+| Run a single-topic, time-boxed research session | `skills/market-research-loop` |
+| Extract marketing tactics from elite sources | `skills/marketing-intelligence` |
+| Research conversion rate optimization evidence | `skills/conversion-research` |
+| Find, profile, and score leads | `skills/lead-intelligence` |
+| Detect automation buying signals in a prospect | `skills/automation-buyer-detection` |
+| Study an elite company (Amazon, Apple, Stripe, etc.) | `skills/elite-company-analysis` |
+| Study a top earner, consultant, creator, or agency | `skills/top-earner-analysis` |
+| Study a sports or entertainment brand | `skills/sports-branding-analysis` |
+
+### Learning & Improvement
+
+| Task Type | Load This Skill |
+|---|---|
+| Convert a research finding into an executable workflow | `skills/workflow-extraction` |
+| Score a finding's evidence quality before proposing | `skills/evidence-review` |
+| Propose or apply a skill update | `skills/skill-improvement` |
+| Review, promote, or archive memory items | `skills/memory-curation` |
+| Design an A/B experiment from a validated insight | `skills/experiment-design` |
+| Run the Friday weekly research synthesis | `skills/weekly-research-review` |
+| Review a concluded experiment and extract the learning | `skills/experiment-learning` |
+| Run the multi-session research orchestrator | `skills/research-loop` |
+
+### System Health
+
+| Task Type | Load This Skill |
+|---|---|
+| Diagnose a workflow or run failure | `skills/workflow-debugging` |
+| Run the system-wide weekly reflection | `skills/weekly-reflection` |
+
 ## Multi-Skill Tasks
 
 If a task clearly spans two skills, run them in sequence:
 1. Primary skill first
-2. `qa-publish-guard` always last before any output is delivered
+2. `qa-publish-guard` always last before any output is delivered to Alfred
 
 Never load more than 2 skills in one task.
 

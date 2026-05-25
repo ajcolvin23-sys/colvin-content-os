@@ -18,7 +18,7 @@ Idea Browser Growth handles all research and opportunity scoring before Alfred b
 # When Not To Use
 
 - The idea is already validated and the task is to build it (use `gabriel-cms` or `content-engine`)
-- The research is about A/B testing a live page (use `humblytics-experiment`)
+- The research is about A/B testing a live page (use `experiment-platform-workflow`)
 - The task is SEO analysis of existing pages (use `analytics-learning-loop`)
 
 # Required Inputs

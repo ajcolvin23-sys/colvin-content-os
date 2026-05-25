@@ -1,6 +1,14 @@
 ---
 name: humblytics-experiment
-description: Use this skill when Gabriel needs to design, launch, monitor, or evaluate an A/B test on any of Alfred's websites or landing pages.
+status: DEPRECATED
+replaced_by: experiment-platform-workflow
+deprecated_date: 2026-05-25
+reason: Replaced with tool-agnostic experiment-platform-workflow skill. Humblytics moved to Level 2 (paid/optional). Free alternatives (Supabase DIY, GA4, GrowthBook, PostHog) now cover all use cases.
+---
+
+> **DEPRECATED** — Do not load this skill. Use `experiment-platform-workflow` instead.
+> This folder is kept for historical reference only.
+
 ---
 
 # Purpose

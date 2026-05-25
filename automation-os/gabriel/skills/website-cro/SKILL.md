@@ -21,8 +21,8 @@ Website CRO improves how well Alfred's pages convert visitors into leads, buyers
 
 - Content creation for social media (use `content-engine`)
 - Full page creation from scratch (use `gabriel-cms`)
-- Visual layout or design decisions (use `paper-design-system`)
-- Setting up the A/B test itself (use `humblytics-experiment`)
+- Visual layout or design decisions (use `design-system-workflow`)
+- Setting up the A/B test itself (use `experiment-platform-workflow`)
 
 # Required Inputs
 
@@ -115,7 +115,7 @@ STATUS: pending_review
 # Memory Update Rules
 
 - Log winning CRO changes in `logs/decisions.md`
-- If an A/B test is involved, hand off to `humblytics-experiment` for test setup
+- If an A/B test is involved, hand off to `experiment-platform-workflow` for test setup
 - Update `logs/experiments.md` when any test launches
 
 # Examples

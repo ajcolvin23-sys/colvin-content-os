@@ -18,13 +18,13 @@ Analytics Learning Loop closes the feedback cycle. After content is published, o
 # When Not To Use
 
 - Before any data exists (no traffic, no sends, no posts live)
-- When the task is running an experiment (use `humblytics-experiment`)
+- When the task is running an experiment (use `experiment-platform-workflow`)
 - When the task is creating new content (use `content-engine`)
 
 # Required Inputs
 
 - Time period being reviewed (last 7 days, last 30 days, specific campaign dates)
-- What data is available (Humblytics dashboard, Supabase records, Telegram brief stats, AgentMail reply counts)
+- What data is available (available analytics platform (GA4, Clarity, GrowthBook, or Supabase DIY — see TOOL_POLICY.md), Supabase records, Telegram brief stats, AgentMail reply counts)
 - Which lanes or channels to focus on
 
 # Minimum Context Needed

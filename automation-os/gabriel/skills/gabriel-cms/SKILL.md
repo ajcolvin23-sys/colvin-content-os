@@ -19,7 +19,7 @@ Gabriel's CMS skill manages all website content as structured, versioned drafts 
 # When Not To Use
 
 - When the task is about conversion rate (use `website-cro`)
-- When the task is about design layout (use `paper-design-system`)
+- When the task is about design layout (use `design-system-workflow`)
 - When the task is about social or email content (use `content-engine`)
 - When the task is about reviewing quality before publish (use `qa-publish-guard`)
 
