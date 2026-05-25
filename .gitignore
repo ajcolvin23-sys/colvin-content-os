@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Gabriel generated/operational data
+automation-os/gabriel/logs/
+automation-os/gabriel/memory/
+automation-os/gabriel/research-output/
+automation-os/gabriel/skill-improvements/
+automation-os/gabriel/skills/**/failure-log.md
+
+# Local/customer-like runtime data
+automation-os/data/leads/
+logs/
