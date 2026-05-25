@@ -1956,7 +1956,7 @@ async function main() {
 
       await resend.emails.send({
         from: `${RESEND_FROM_NAME} <${RESEND_FROM_EMAIL}>`,
-        reply_to: RESEND_REPLY_TO,
+        replyTo: RESEND_REPLY_TO,
         to: ['itsinthebible.info@gmail.com'],
         subject: `Gabriel Brief — ${TODAY} — ${report.summary.leads_found} leads, ${report.summary.outreach_drafts_created} drafts`,
         html: emailHtml,
