@@ -594,32 +594,73 @@ async function markAgentMailRead(inboxId: string, messageId: string): Promise<vo
   });
 }
 
-// ── Lane search query definitions ─────────────────────────────────────────────
+// ── Blocked domains — never use leads from these sources ─────────────────────
+const BLOCKED_DOMAINS = [
+  'upwork.com', 'freelancer.com', 'peopleperhour.com', 'fiverr.com',
+  'toptal.com', 'guru.com', 'bark.com', 'thumbtack.com', 'taskrabbit.com',
+  'indeed.com', 'ziprecruiter.com', 'glassdoor.com', 'monster.com',
+];
+
+function isBlockedDomain(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    return BLOCKED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+  } catch { return false; }
+}
+
+// ── Lane search query definitions — targets: LinkedIn, Reddit, Facebook, Instagram, TikTok, business sites
 const LANE_SEARCH_QUERIES: Record<string, string[]> = {
   colvin_enterprises: [
-    'Indianapolis small business operations consulting 2024',
-    'Indianapolis entrepreneur AI automation workflow',
-    'Indianapolis professional services firm technology upgrade',
+    // LinkedIn profiles — Indianapolis decision makers
+    'site:linkedin.com/in "Indianapolis" ("business owner" OR "CEO" OR "operations director" OR "marketing director")',
+    // Reddit — Indianapolis business community
+    'site:reddit.com/r/indianapolis "small business" OR "entrepreneur" AI automation workflow',
+    // Facebook — Indianapolis business groups and pages
+    'site:facebook.com "Indianapolis small business" group owner entrepreneur 2024',
+    // Business websites — Indianapolis agencies and firms
+    '"Indianapolis" ("marketing agency" OR "consulting firm" OR "operations") CEO founder contact site:.com',
   ],
   indiana_backflow: [
-    'Indianapolis property management company backflow prevention',
-    'Indiana commercial building facility manager plumbing compliance',
-    'Indianapolis apartment complex maintenance director',
+    // LinkedIn — property managers and facility directors
+    'site:linkedin.com/in "Indianapolis" ("property manager" OR "facility director" OR "building manager" OR "HOA manager")',
+    // Reddit — Indianapolis landlords and property owners
+    'site:reddit.com/r/indianapolis landlord "property management" plumbing compliance',
+    // Business websites — Indiana property management companies
+    '"Indiana" "property management" "backflow" OR "plumbing" company contact page site:.com',
+    // Facebook — Indiana landlord and property management groups
+    'site:facebook.com "Indiana property management" OR "Indianapolis landlords" group',
   ],
   music_theory_secrets: [
-    'Indianapolis church musician gospel piano worship director',
-    'Indiana gospel music ministry choir director',
-    'Indianapolis music school piano instructor gospel jazz',
+    // Reddit — gospel piano, church music, worship communities
+    'site:reddit.com ("r/churchmusic" OR "r/piano" OR "r/gospel") "gospel piano" OR "worship music" OR "church musician"',
+    // Facebook — church music and gospel piano communities
+    'site:facebook.com "gospel piano" OR "church music" group members musicians',
+    // Instagram — gospel piano and worship music pages (via web)
+    'site:instagram.com "gospel piano" OR "worship pianist" OR "church musician" Indianapolis',
+    // TikTok — music education creators
+    'site:tiktok.com "gospel piano" OR "piano tutorial" OR "church music" creator',
+    // LinkedIn — music directors, worship leaders
+    'site:linkedin.com/in "worship director" OR "music director" OR "choir director" church Indianapolis Indiana',
   ],
   first_keys_indy: [
-    'Indianapolis first time homebuyer assistance program Marion County',
-    'Indianapolis affordable housing non profit homeownership',
-    'Indiana down payment assistance first time buyer realtor',
+    // Facebook — first-time homebuyer groups in Indianapolis
+    'site:facebook.com "Indianapolis first time homebuyer" OR "Marion County homebuyer" group',
+    // Reddit — Indianapolis real estate and homebuying
+    'site:reddit.com/r/indianapolis "first time homebuyer" OR "down payment" OR "FHA" 2024',
+    // LinkedIn — Indianapolis realtors and housing nonprofits
+    'site:linkedin.com/in "Indianapolis" ("realtor" OR "housing counselor" OR "homebuyer specialist")',
+    // Business websites — Indiana housing assistance organizations
+    '"Marion County" "homebuyer assistance" OR "down payment assistance" nonprofit contact site:.org',
   ],
   funding_ready_indiana: [
-    'Indianapolis small business owner grant funding opportunity Indiana',
-    'Indiana minority owned business development center grants',
-    'Indianapolis nonprofit organization funding economic development',
+    // LinkedIn — Indiana nonprofit executives and small business owners
+    'site:linkedin.com/in "Indiana" ("executive director" OR "small business owner" OR "founder") nonprofit grants',
+    // Reddit — Indiana small business and grants discussions
+    'site:reddit.com/r/Indiana OR site:reddit.com/r/indianapolis "small business grant" OR "SBA funding" 2024',
+    // Facebook — Indiana small business and entrepreneur groups
+    'site:facebook.com "Indiana small business" OR "Indiana entrepreneurs" group grants funding',
+    // Business websites — Indiana SBDCs, CDFIs, and chambers
+    '"Indiana" ("SBDC" OR "CDFI" OR "chamber of commerce") "small business" grant funding contact site:.org OR site:.com',
   ],
 };
 
@@ -650,7 +691,12 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
       const query = queries[queryIndex];
 
       console.log(`  ${lane}: searching "${query.slice(0, 60)}..."`);
-      const results = await callFirecrawlSearch(query, config.lead_scout.max_leads_per_lane_per_run);
+      const rawResults = await callFirecrawlSearch(query, config.lead_scout.max_leads_per_lane_per_run);
+
+      // Filter out freelance marketplaces and job boards
+      const results = rawResults.filter(r => !isBlockedDomain(r.url));
+      const blocked = rawResults.length - results.length;
+      if (blocked > 0) console.log(`  ${lane}: filtered ${blocked} freelance/job-board result(s)`);
 
       if (results.length === 0) {
         console.log(`  ${lane}: Firecrawl returned 0 results — skipping lane`);
