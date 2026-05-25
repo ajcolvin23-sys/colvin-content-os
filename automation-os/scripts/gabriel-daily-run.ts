@@ -609,58 +609,60 @@ function isBlockedDomain(url: string): boolean {
 }
 
 // ── Lane search query definitions — targets: LinkedIn, Reddit, Facebook, Instagram, TikTok, business sites
+// NOTE: Firecrawl /v1/search does NOT support Google-style site: operators.
+// All queries use plain natural language so Firecrawl's web search returns real results.
 const LANE_SEARCH_QUERIES: Record<string, string[]> = {
   colvin_enterprises: [
-    // LinkedIn profiles — Indianapolis decision makers
-    'site:linkedin.com/in "Indianapolis" ("business owner" OR "CEO" OR "operations director" OR "marketing director")',
-    // Reddit — Indianapolis business community
-    'site:reddit.com/r/indianapolis "small business" OR "entrepreneur" AI automation workflow',
-    // Facebook — Indianapolis business groups and pages
-    'site:facebook.com "Indianapolis small business" group owner entrepreneur 2024',
-    // Business websites — Indianapolis agencies and firms
-    '"Indianapolis" ("marketing agency" OR "consulting firm" OR "operations") CEO founder contact site:.com',
+    // AI automation buyers — Indianapolis small business owners
+    'Indianapolis small business owner looking for AI automation tools to save time',
+    // Operations/marketing decision makers
+    'Indianapolis CEO operations director marketing director struggling with manual workflows',
+    // Agency owners open to automation
+    'Indianapolis marketing agency consulting firm founder automating business processes',
+    // Reddit community signals
+    'reddit Indianapolis entrepreneur small business AI tools workflow automation',
   ],
   indiana_backflow: [
-    // LinkedIn — property managers and facility directors
-    'site:linkedin.com/in "Indianapolis" ("property manager" OR "facility director" OR "building manager" OR "HOA manager")',
-    // Reddit — Indianapolis landlords and property owners
-    'site:reddit.com/r/indianapolis landlord "property management" plumbing compliance',
-    // Business websites — Indiana property management companies
-    '"Indiana" "property management" "backflow" OR "plumbing" company contact page site:.com',
-    // Facebook — Indiana landlord and property management groups
-    'site:facebook.com "Indiana property management" OR "Indianapolis landlords" group',
+    // Property managers needing backflow compliance
+    'Indianapolis property manager backflow testing certification annual requirement',
+    // Facility directors and building managers
+    'Indiana facility manager building manager backflow prevention inspection compliance',
+    // Landlord compliance discussions
+    'Indianapolis landlord plumbing compliance backflow preventer required',
+    // Property management companies in Indiana
+    'Indiana property management company backflow inspection service contact',
   ],
   music_theory_secrets: [
-    // Reddit — gospel piano, church music, worship communities
-    'site:reddit.com ("r/churchmusic" OR "r/piano" OR "r/gospel") "gospel piano" OR "worship music" OR "church musician"',
-    // Facebook — church music and gospel piano communities
-    'site:facebook.com "gospel piano" OR "church music" group members musicians',
-    // Instagram — gospel piano and worship music pages (via web)
-    'site:instagram.com "gospel piano" OR "worship pianist" OR "church musician" Indianapolis',
-    // TikTok — music education creators
-    'site:tiktok.com "gospel piano" OR "piano tutorial" OR "church music" creator',
-    // LinkedIn — music directors, worship leaders
-    'site:linkedin.com/in "worship director" OR "music director" OR "choir director" church Indianapolis Indiana',
+    // Gospel piano learners seeking lessons
+    'learn gospel piano chords church musician beginner online lessons',
+    // Worship pianists looking for training
+    'worship pianist music director gospel chord progressions learn online',
+    // Church musicians seeking skill development
+    'church musician gospel piano training Indianapolis Indiana worship music',
+    // Reddit piano and church music communities
+    'reddit piano gospel music church musician looking for lessons worship',
+    // Music directors and choir directors
+    'Indianapolis music director choir director worship leader gospel piano skills',
   ],
   first_keys_indy: [
-    // Facebook — first-time homebuyer groups in Indianapolis
-    'site:facebook.com "Indianapolis first time homebuyer" OR "Marion County homebuyer" group',
-    // Reddit — Indianapolis real estate and homebuying
-    'site:reddit.com/r/indianapolis "first time homebuyer" OR "down payment" OR "FHA" 2024',
-    // LinkedIn — Indianapolis realtors and housing nonprofits
-    'site:linkedin.com/in "Indianapolis" ("realtor" OR "housing counselor" OR "homebuyer specialist")',
-    // Business websites — Indiana housing assistance organizations
-    '"Marion County" "homebuyer assistance" OR "down payment assistance" nonprofit contact site:.org',
+    // First-time buyers researching assistance programs
+    'Indianapolis first time homebuyer down payment assistance program 2025',
+    // Marion County homebuyer programs
+    'Marion County Indiana homebuyer grant program how to qualify apply',
+    // Reddit Indianapolis real estate discussions
+    'reddit Indianapolis first time home buyer FHA loan down payment help',
+    // Realtors and housing counselors
+    'Indianapolis realtor housing counselor first time homebuyer specialist',
   ],
   funding_ready_indiana: [
-    // LinkedIn — Indiana nonprofit executives and small business owners
-    'site:linkedin.com/in "Indiana" ("executive director" OR "small business owner" OR "founder") nonprofit grants',
-    // Reddit — Indiana small business and grants discussions
-    'site:reddit.com/r/Indiana OR site:reddit.com/r/indianapolis "small business grant" OR "SBA funding" 2024',
-    // Facebook — Indiana small business and entrepreneur groups
-    'site:facebook.com "Indiana small business" OR "Indiana entrepreneurs" group grants funding',
-    // Business websites — Indiana SBDCs, CDFIs, and chambers
-    '"Indiana" ("SBDC" OR "CDFI" OR "chamber of commerce") "small business" grant funding contact site:.org OR site:.com',
+    // Indiana nonprofit and small business grant seekers
+    'Indiana nonprofit executive director small business grant funding 2025',
+    // SBA and SBDC grant discussions
+    'Indiana small business SBA grant SBDC funding application help 2025',
+    // Indianapolis entrepreneurs seeking capital
+    'Indianapolis entrepreneur startup funding seed capital grant Indiana',
+    // Indiana CDFIs and chambers serving small businesses
+    'Indiana CDFI chamber of commerce small business grant funding contact',
   ],
 };
 
