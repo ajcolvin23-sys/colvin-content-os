@@ -64,6 +64,12 @@ const SKIPPED_LANES: Array<{ lane: string; reason: string; query?: string }> = [
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
+function toDbScore(score: number | null | undefined): number {
+  const value = Number(score ?? 0);
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(10, Math.round(value)));
+}
+
 // ── Config ───────────────────────────────────────────────────────────────────
 const CONFIG_PATH = path.join(__dirname, '../config/gabriel-config.json');
 const DATA_PATH = path.join(__dirname, '../data');
@@ -1656,7 +1662,7 @@ async function step12_saveOutputs(
         linkedin_url: l.linkedin_url ?? null,
         lane: l.lane,
         fit_reason: l.fit_reason,
-        qualification_score: l.qualification_score,
+        qualification_score: toDbScore(l.qualification_score),
         source: l.source,
         lead_type: (!l.name && l.company) ? 'organization' : 'person',
         status: 'new',
@@ -1697,7 +1703,7 @@ async function step12_saveOutputs(
             lane: d.lane,
             message_type: d.message_type,
             draft: d.draft,
-            priority_score: d.priority_score,
+            priority_score: toDbScore(d.priority_score),
             compliance_flags: d.compliance_flags,
             katrina_review_required: d.katrina_review_required,
             status: 'pending_review',
