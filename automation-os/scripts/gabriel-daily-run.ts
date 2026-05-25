@@ -60,9 +60,7 @@ const RUN_ID = `gabriel-${TODAY}-${RUN_START}`;
 const SKIPPED_LANES: Array<{ lane: string; reason: string; query?: string }> = [];
 
 // ── Clients ──────────────────────────────────────────────────────────────────
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  realtime: { enabled: false },  // Gabriel uses REST only — no WebSocket needed
-});
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // ── Config ───────────────────────────────────────────────────────────────────
