@@ -1026,7 +1026,7 @@ Return JSON: { draft: string, compliance_flags: string[] }`;
       }
 
       drafts.push({
-        lead_name: lead.name,
+        lead_name: lead.name ?? '[Contact]',
         lead_company: lead.company,
         lane: lead.lane,
         message_type: 'linkedin_connection',
@@ -1323,7 +1323,7 @@ Return JSON only (no markdown):
       const report: SolomonSEOReport = {
         lane,
         query_used: query,
-        serp_results: serpResults.map(r => ({ url: r.url, title: r.title, description: r.description })),
+        serp_results: serpResults.map(r => ({ url: r.url, title: r.title ?? '', description: r.description ?? '' })),
         keyword_patterns: parsed.keyword_patterns.slice(0, 5),
         content_gaps: parsed.content_gaps.slice(0, 3),
         opportunities: parsed.opportunities.slice(0, 3),
