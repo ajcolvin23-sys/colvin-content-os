@@ -37,6 +37,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || '';
+const BRAVE_SEARCH_API_KEY = process.env.BRAVE_SEARCH_API_KEY || '';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
@@ -529,6 +530,44 @@ async function callFirecrawlSearch(query: string, limit = 5): Promise<FirecrawlS
   });
 }
 
+// ── Brave Search fallback ────────────────────────────────────────────────────
+// Used when Firecrawl returns 0 results. Free tier = 2,000 queries/month.
+async function callBraveSearch(query: string, limit = 5): Promise<FirecrawlSearchResult[]> {
+  if (!BRAVE_SEARCH_API_KEY) return [];
+  return new Promise((resolve) => {
+    const params = new URLSearchParams({ q: query, count: String(limit) });
+    const req = https.request({
+      hostname: 'api.search.brave.com',
+      path: `/res/v1/web/search?${params}`,
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': BRAVE_SEARCH_API_KEY,
+      },
+    }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        try {
+          const raw = Buffer.concat(chunks).toString();
+          const parsed = JSON.parse(raw);
+          const results = (parsed?.web?.results ?? []).map((r: { url: string; title: string; description: string }) => ({
+            url: r.url,
+            title: r.title,
+            description: r.description,
+            markdown: '',
+          }));
+          resolve(results as FirecrawlSearchResult[]);
+        } catch { resolve([]); }
+      });
+    });
+    req.on('error', () => resolve([]));
+    req.setTimeout(15000, () => { req.destroy(); resolve([]); });
+    req.end();
+  });
+}
+
 // ── AgentMail Helpers ────────────────────────────────────────────────────────
 // Raw HTTPS calls to AgentMail REST API — no extra npm dependency needed
 
@@ -693,7 +732,14 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
       const query = queries[queryIndex];
 
       console.log(`  ${lane}: searching "${query.slice(0, 60)}..."`);
-      const rawResults = await callFirecrawlSearch(query, config.lead_scout.max_leads_per_lane_per_run);
+      let rawResults = await callFirecrawlSearch(query, config.lead_scout.max_leads_per_lane_per_run);
+
+      // Brave Search fallback if Firecrawl returns nothing
+      if (rawResults.length === 0 && BRAVE_SEARCH_API_KEY) {
+        console.log(`  ${lane}: Firecrawl empty — trying Brave Search fallback...`);
+        rawResults = await callBraveSearch(query, config.lead_scout.max_leads_per_lane_per_run);
+        if (rawResults.length > 0) console.log(`  ${lane}: Brave returned ${rawResults.length} results`);
+      }
 
       // Filter out freelance marketplaces and job boards
       const results = rawResults.filter(r => !isBlockedDomain(r.url));
@@ -701,8 +747,8 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
       if (blocked > 0) console.log(`  ${lane}: filtered ${blocked} freelance/job-board result(s)`);
 
       if (results.length === 0) {
-        console.log(`  ${lane}: Firecrawl returned 0 results — skipping lane`);
-        SKIPPED_LANES.push({ lane, reason: 'Firecrawl returned 0 results', query });
+        console.log(`  ${lane}: no results from Firecrawl or Brave — skipping lane`);
+        SKIPPED_LANES.push({ lane, reason: 'No results from Firecrawl or Brave Search', query });
         continue;
       }
 
