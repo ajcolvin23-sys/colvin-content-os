@@ -49,9 +49,29 @@
       "temperature": 0.4
     }
   },
+  "anthropic_routing": {
+    "deep_strategy": {
+      "model": "claude-opus-4-5",
+      "provider": "anthropic",
+      "reason": "Complex multi-step reasoning — audit, strategy, red team simulation",
+      "max_tokens": 4000,
+      "temperature": 0.4,
+      "use_when": ["system_audit", "campaign_strategy", "compliance_review", "red_team"]
+    },
+    "fast_analysis": {
+      "model": "claude-haiku-3-5",
+      "provider": "anthropic",
+      "reason": "Fast structured analysis — dedup, categorization, scoring verification",
+      "max_tokens": 1000,
+      "temperature": 0.2,
+      "use_when": ["deduplication", "categorization", "score_verification"]
+    }
+  },
   "cost_guardrails": {
     "max_daily_openai_calls": 100,
+    "max_daily_anthropic_calls": 20,
     "preferred_model_for_bulk": "gpt-4o-mini",
-    "escalate_to_gpt4o_when": ["content_generation", "seo_synthesis", "self_audit"]
+    "escalate_to_gpt4o_when": ["content_generation", "seo_synthesis", "self_audit"],
+    "escalate_to_claude_when": ["system_audit", "campaign_strategy", "compliance_review"]
   }
 }

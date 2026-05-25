@@ -38,6 +38,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || '';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const KATRINA_TELEGRAM_CHAT_ID = process.env.KATRINA_TELEGRAM_CHAT_ID || '';
 
 const TODAY = new Date().toISOString().split('T')[0];
