@@ -1,0 +1,173 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://colvin-content-os.vercel.app/schemas/outreach.schema.json",
+  "title": "OutreachDraft",
+  "description": "Outreach message draft schema. All outreach drafts require Alfred's approval before sending.",
+  "type": "object",
+  "required": [
+    "id", "lead_name", "lead_company", "lane", "message_type", "draft",
+    "compliance_flags", "katrina_review_required", "status",
+    "idempotency_key", "run_id", "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "lead_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "Reference to lead record in lead table"
+    },
+    "lead_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "lead_company": {
+      "type": ["string", "null"],
+      "maxLength": 300
+    },
+    "lead_title": {
+      "type": ["string", "null"],
+      "maxLength": 200
+    },
+    "lane": {
+      "type": "string",
+      "enum": [
+        "colvin_enterprises",
+        "indiana_backflow_directory",
+        "music_theory_secrets",
+        "piano_app",
+        "youtube_music_education",
+        "first_keys_indy",
+        "funding_ready_indiana",
+        "girls_got_game",
+        "glory_engine_yahweh_comics"
+      ]
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "linkedin_connection",
+        "linkedin_followup",
+        "email",
+        "email_followup",
+        "sms"
+      ]
+    },
+    "sequence_step": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Which step in a multi-touch sequence (1 = first touch)"
+    },
+    "sequence_id": {
+      "type": ["string", "null"],
+      "description": "Groups multiple touchpoints in the same sequence"
+    },
+    "subject_line": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Email subject line. Required for email type."
+    },
+    "draft": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000,
+      "description": "The full message draft text"
+    },
+    "character_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "personalization_data": {
+      "type": ["object", "null"],
+      "description": "Key-value pairs used for personalization in the draft",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "priority_score": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Priority for review queue ordering"
+    },
+    "compliance_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["flag_type", "description", "severity"],
+        "properties": {
+          "flag_type": {
+            "type": "string",
+            "enum": [
+              "can_spam_missing_unsubscribe",
+              "spam_trigger_word",
+              "hud_respa_financial_claim",
+              "youth_safety",
+              "purchased_list_risk",
+              "gdpr_consent_required",
+              "ftc_disclosure_needed",
+              "unverified_claim"
+            ]
+          },
+          "description": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warning", "block"]
+          }
+        }
+      },
+      "description": "Any 'block' severity item prevents sending until resolved."
+    },
+    "katrina_review_required": {
+      "type": "boolean",
+      "description": "Whether Katrina (Alfred) must personally review before this can send"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "in_review",
+        "approved",
+        "rejected",
+        "revision_requested",
+        "sent",
+        "bounced",
+        "replied",
+        "unsubscribed"
+      ]
+    },
+    "alfred_feedback": {
+      "type": ["string", "null"],
+      "maxLength": 2000
+    },
+    "sent_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Format: {lane}_outreach_{lead_id_short}_{message_type}_{sequence_step}_{date}",
+      "examples": ["colvin_enterprises_outreach_abc123_linkedin_connection_1_2025-01-15"]
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "trace_id": {
+      "type": ["string", "null"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}

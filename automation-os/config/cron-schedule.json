@@ -1,0 +1,49 @@
+{
+  "note": "All production cron runs via GitHub Actions ONLY. Local cron and Vercel cron disabled to prevent triple-trigger.",
+
+  "jobs": {
+    "gabriel_daily": {
+      "schedule_utc": "0 13 * * *",
+      "schedule_human": "7:00 AM CST daily",
+      "github_actions_file": ".github/workflows/gabriel-daily.yml",
+      "command": "npm run gabriel:daily",
+      "status": "active"
+    },
+    "daily_video": {
+      "schedule_utc_weekday": "0 10 * * 1-5",
+      "schedule_utc_weekend": "0 15 * * 0,6",
+      "schedule_human": "5:00 AM EST weekdays, 10:00 AM EST weekends",
+      "github_actions_file": ".github/workflows/daily-video.yml",
+      "status": "active"
+    },
+    "gabriel_obsidian_sync": {
+      "schedule_local": "*/30 * * * *",
+      "schedule_human": "Every 30 minutes",
+      "command": "/usr/local/bin/node /Users/katrinacolvin/Colvin-Hermes-Workspace/hermes-prime/scripts/sync-gabriel-to-obsidian.js",
+      "log": "/tmp/gabriel-sync.log",
+      "status": "active — runs on Alfred's Mac",
+      "note": "Node path FIXED to /usr/local/bin/node (was /usr/bin/env node — caused failures)"
+    },
+    "morning_brief": {
+      "schedule_local": "0 7 * * *",
+      "schedule_human": "7:00 AM daily",
+      "command": "python3 scripts/daily-report.py",
+      "log": "~/Colvin-Hermes-Workspace/09_Outputs/cron.log",
+      "status": "active — CRM connection optional (script runs even if CRM is offline)"
+    },
+    "task_inbox": {
+      "schedule_local": "0 8-20/2 * * *",
+      "schedule_human": "Every 2 hours, 8am–8pm",
+      "command": "python3 scripts/hermes-runner.py",
+      "log": "~/Colvin-Hermes-Workspace/09_Outputs/cron.log",
+      "status": "active — CRM connection optional"
+    }
+  },
+
+  "disabled_jobs": {
+    "local_video_cron": {
+      "reason": "Removed to prevent triple-trigger with GitHub Actions",
+      "was": "0 5 * * 1-5 /Users/katrinacolvin/colvin-content-os/scripts/run-daily-video.sh"
+    }
+  }
+}

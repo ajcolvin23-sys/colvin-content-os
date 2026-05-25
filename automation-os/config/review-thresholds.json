@@ -1,0 +1,31 @@
+{
+  "lead_scoring": {
+    "add_to_outreach_queue_min": 7,
+    "save_to_leads_table_min": 5,
+    "auto_archive_below": 5,
+    "carry_forward_min": 8,
+    "stale_after_days": 3,
+    "auto_archive_stale_below_score": 6,
+    "telegram_reminder_after_days": 3
+  },
+  "content_review": {
+    "auto_archive_after_days": 7,
+    "reminder_after_days": 2
+  },
+  "outreach_review": {
+    "auto_archive_after_days": 5,
+    "reminder_after_days": 3,
+    "max_revisions": 2
+  },
+  "qa_gate": {
+    "pass_threshold": 8,
+    "revise_threshold": 7,
+    "fail_below": 7,
+    "max_retries": 2
+  },
+  "campaign": {
+    "min_score_to_run": 7,
+    "max_active_campaigns": 3,
+    "dedup_window_days": 30
+  }
+}

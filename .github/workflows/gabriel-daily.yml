@@ -1,0 +1,69 @@
+# Gabriel Daily Run — 15-Step Business Automation
+# Schedule: 13:00 UTC = 7:00 AM CST (daily)
+#
+# Pipeline:
+#   1. Load config + memory
+#   2. Lead Scout (find prospects)
+#   3. Draft outreach messages (NEVER auto-send)
+#   4. Generate content drafts (NEVER auto-publish)
+#   5. SEO + marketing intelligence
+#   6. Deduplicate, score, categorize
+#   7. Build review package
+#   8. Save to Supabase + data files
+#   9. Send Telegram daily brief to Alfred
+
+name: Gabriel Daily Run
+
+on:
+  schedule:
+    # 7:00 AM CST daily (13:00 UTC)
+    - cron: '0 13 * * *'
+  workflow_dispatch: # Manual trigger from GitHub UI
+
+jobs:
+  gabriel-daily:
+    name: Gabriel 15-Step Daily Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Gabriel daily sequence
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          KATRINA_TELEGRAM_CHAT_ID: ${{ secrets.KATRINA_TELEGRAM_CHAT_ID }}
+        run: npm run gabriel:daily
+
+      - name: Upload daily output artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gabriel-daily-${{ github.run_id }}
+          path: automation-os/data/
+          retention-days: 30
+
+      - name: Notify failure via Telegram
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="GABRIEL DAILY RUN FAILED — $(date '+%Y-%m-%d')%0ACheck GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -d parse_mode="HTML"

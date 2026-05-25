@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-05-24",
+  "note": "Single canonical list. Load this file into every prompt that generates outreach. Never duplicate.",
+
+  "forbidden_openers": [
+    "I hope this message finds you well",
+    "I hope this finds you well",
+    "I noticed we share",
+    "I came across your profile",
+    "I came across your work",
+    "I'm reaching out because",
+    "Just wanted to",
+    "Following up on my previous message",
+    "I admire your work",
+    "I admire what you do",
+    "I love what you're doing",
+    "I love what you've built",
+    "I've been following your work",
+    "I'm a big fan of",
+    "I'd love to pick your brain",
+    "I think we could really help each other",
+    "I wanted to connect",
+    "Are you open to connecting",
+    "I hope you don't mind me reaching out",
+    "Sorry to bother you",
+    "It was great meeting you",
+    "It's great to connect",
+    "your insights are vital",
+    "your work is vital",
+    "your work is commendable",
+    "your work is inspiring",
+    "your contributions are pivotal",
+    "what you're doing is important"
+  ],
+
+  "forbidden_patterns_regex": [
+    "I (came across|noticed|saw|found) (your|the) (profile|post|work|company|article)",
+    "I (admire|love|appreciate|respect) (your|what you)",
+    "I hope (this|my message|this message) finds you",
+    "Would love to (connect and)? (share insights|pick your brain|chat|grab coffee)",
+    "Let's (connect and)? (share insights|collaborate|explore synergies|trade ideas)"
+  ],
+
+  "required_opener_standard": "Lead with a specific observation about their business, a shared Indianapolis context, or a direct and honest value statement. One sentence. No flattery. No vague praise.",
+
+  "examples_bad": [
+    "I admire the work GreenTech Solutions is doing in sustainability.",
+    "Your insights on down payment assistance are vital for our community.",
+    "Your work in gospel music is inspiring and pivotal for our community.",
+    "I came across your profile and was impressed by your experience."
+  ],
+
+  "examples_good": [
+    "Saw that Isley Plumbing handles backflow testing — we run a certified tester directory for Indiana property managers.",
+    "FHLBank's LAUNCH program is one of the most underused DPA resources in Indiana — I help first-time buyers navigate it.",
+    "Eastern Star has one of the strongest worship programs in Indianapolis — I wrote a gospel piano theory book and would value your take.",
+    "Centric's Indianapolis team works with a lot of mid-market ops teams — I help those same teams cut manual work with AI."
+  ]
+}

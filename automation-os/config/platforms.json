@@ -1,0 +1,53 @@
+{
+  "linkedin": {
+    "enabled": true,
+    "auto_post": false,
+    "connection_request_max_chars": 300,
+    "post_max_chars": 3000,
+    "hashtags_max": 5,
+    "best_post_times_cst": ["7:30", "12:00", "17:00"],
+    "notes": "Requires Alfred to manually send all messages and posts"
+  },
+  "instagram": {
+    "enabled": true,
+    "auto_post": false,
+    "caption_max_chars": 2200,
+    "hashtags_max": 30,
+    "best_post_times_cst": ["6:00", "11:00", "19:00"],
+    "notes": "Content drafted and saved — Alfred publishes via Meta Business Suite"
+  },
+  "facebook": {
+    "enabled": true,
+    "auto_post": false,
+    "post_max_chars": 63206,
+    "notes": "Content drafted — Alfred publishes via Meta Business Suite or Facebook Page"
+  },
+  "tiktok": {
+    "enabled": false,
+    "auto_post": false,
+    "notes": "Client key configured but OAuth flow not yet completed"
+  },
+  "youtube": {
+    "enabled": false,
+    "auto_post": false,
+    "notes": "Client key configured but OAuth flow not yet completed. Scripts generated, upload manual."
+  },
+  "email": {
+    "enabled": true,
+    "auto_send": false,
+    "provider": "resend",
+    "sdk": "resend (npm)",
+    "free_tier": "3,000 emails/month, 100/day",
+    "setup_required": ["RESEND_API_KEY in .env.local", "Verify sending domain in Resend dashboard"],
+    "from_address_until_domain_verified": "onboarding@resend.dev",
+    "can_spam_footer": true,
+    "unsubscribe_required": true,
+    "notes": "Resend integrated. RESEND_API_KEY required. Drafts saved to Supabase — Alfred approves before sending. Domain verification needed per lane sender address."
+  },
+  "telegram": {
+    "enabled": true,
+    "purpose": "Internal notifications only — Alfred's daily brief and error alerts",
+    "auto_send": true,
+    "notes": "Only internal use. Never use for outreach to prospects."
+  }
+}

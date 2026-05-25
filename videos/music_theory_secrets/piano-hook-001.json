@@ -1,0 +1,80 @@
+{
+  "video_id": "piano-hook-001",
+  "created_at": "2026-05-24T00:00:00Z",
+  "campaign": "Music Theory Secrets — Book Launch",
+  "brand": "music_theory_secrets",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "title": "Gospel Piano Hook — The Secret Chord",
+  "audience": "Church musicians and gospel piano beginners on TikTok",
+  "goal": "Drive to book sales page",
+  "hook": "This one chord progression will change how you play gospel piano forever.",
+  "scenes": [
+    {
+      "id": "s1-hook",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "This chord will change how you play gospel piano forever.",
+      "emphasis": "change",
+      "caption_text": "This chord changes everything.",
+      "motion": "zoom_in"
+    },
+    {
+      "id": "s2-problem",
+      "type": "problem",
+      "duration_seconds": 4,
+      "headline": "Most gospel musicians learn by ear. But they don't know WHY it sounds good.",
+      "emphasis": "WHY",
+      "caption_text": "You play it — but do you know why it works?",
+      "motion": "fade"
+    },
+    {
+      "id": "s3-solution",
+      "type": "solution",
+      "duration_seconds": 4,
+      "headline": "Music Theory Secrets teaches you the gospel language — systematically.",
+      "body": "The book Alfred Colvin always needed — now it exists.",
+      "caption_text": "Learn the theory behind the music you already love.",
+      "motion": "slide_up"
+    },
+    {
+      "id": "s4-step",
+      "type": "step",
+      "duration_seconds": 4,
+      "headline": "Lesson 1: The II-V-I in gospel",
+      "body": "The foundation of every gospel chord progression you've ever heard.",
+      "caption_text": "Lesson 1: The II-V-I progression.",
+      "motion": "slide_left"
+    },
+    {
+      "id": "s5-proof",
+      "type": "proof",
+      "duration_seconds": 4,
+      "stat": "12",
+      "stat_label": "Chapters covering gospel chords, runs, turnarounds, and worship",
+      "caption_text": "12 chapters. Gospel chords, runs, and worship music theory.",
+      "motion": "fade"
+    },
+    {
+      "id": "s6-cta",
+      "type": "cta",
+      "duration_seconds": 4,
+      "headline": "Get the book. Learn the language of gospel.",
+      "cta_text": "Get Music Theory Secrets",
+      "cta_url": "https://musictheorysecrets.com",
+      "caption_text": "Get the book — link in bio.",
+      "motion": "fade"
+    }
+  ],
+  "voiceover_script": "This one chord progression will change how you play gospel piano forever. Most gospel musicians learn by ear. But they don't know WHY it sounds so good. Music Theory Secrets teaches you the gospel language — systematically. Starting with Lesson 1: the II-V-I, the foundation of every gospel chord progression you've ever heard. The book covers 12 chapters — gospel chords, runs, turnarounds, and worship music theory. Get the book. Learn the language of gospel. Link in bio.",
+  "music_direction": "Gospel piano intro — 4-beat intro with that II-V-I feel. Warm, soulful.",
+  "thumbnail_concept": "Hands on piano keys. Glowing chord diagram overlay. Text: 'The Secret Chord.'",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft"
+}

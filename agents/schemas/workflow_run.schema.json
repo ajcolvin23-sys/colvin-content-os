@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://colvin-content-os.vercel.app/schemas/workflow_run.schema.json",
+  "title": "WorkflowRun",
+  "description": "Durable state record for a workflow run or stage. Stored in Supabase workflow_runs table.",
+  "type": "object",
+  "required": ["id", "stage", "status", "attempt", "source", "run_id", "trace_id", "idempotency_key", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Primary key for this run record"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Root span ID. Same for all stages in one workflow execution."
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "Stage-level trace ID. Unique per stage execution."
+    },
+    "workflow_name": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "enum": [
+        "daily_lead_workflow",
+        "daily_marketing_workflow",
+        "daily_remotion_content_workflow",
+        "email_outreach_workflow",
+        "funnel_creation_workflow",
+        "admin_qa_workflow",
+        "weekly_optimization_workflow",
+        "incident_recovery_workflow",
+        "stage_replay_workflow",
+        null
+      ]
+    },
+    "stage": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Name of the pipeline stage (e.g. 'lead_extraction', 'lead_scoring', 'outreach_draft')"
+    },
+    "agent": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Name of the agent that executed this stage"
+    },
+    "lane": {
+      "type": ["string", "null"],
+      "enum": [
+        "colvin_enterprises",
+        "indiana_backflow_directory",
+        "music_theory_secrets",
+        "piano_app",
+        "youtube_music_education",
+        "first_keys_indy",
+        "funding_ready_indiana",
+        "girls_got_game",
+        "glory_engine_yahweh_comics",
+        null
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "running", "completed", "failed", "blocked", "replaying", "skipped"]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Attempt number. 1 = first try. Increments on retry."
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "What triggered this run (e.g. 'cron', 'manual', 'replay', 'incident_recovery')"
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Source attribution and data lineage for this run",
+      "properties": {
+        "triggered_by": { "type": "string" },
+        "parent_run_id": { "type": ["string", "null"], "format": "uuid" },
+        "replay_of_stage": { "type": ["string", "null"] },
+        "input_hash": { "type": ["string", "null"] }
+      }
+    },
+    "input_snapshot": {
+      "type": ["object", "null"],
+      "description": "Sanitized copy of stage inputs for replay. No API keys or PII."
+    },
+    "output_snapshot": {
+      "type": ["object", "null"],
+      "description": "Sanitized copy of stage outputs"
+    },
+    "items_processed": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "items_succeeded": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "items_failed": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "duration_ms": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Stage execution time in milliseconds"
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "next_retry_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Format: {workflow}_{stage}_{run_id_short}. Prevents duplicate execution."
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "error_metadata": {
+      "type": ["object", "null"],
+      "required": ["code", "message", "is_retryable"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code (e.g. 'HTTP_429', 'SCHEMA_VALIDATION', 'POLICY_VIOLATION')"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "stack_trace": {
+          "type": ["string", "null"],
+          "description": "Stack trace if available. Never log API keys or PII."
+        },
+        "is_retryable": {
+          "type": "boolean",
+          "description": "Whether this error type supports automatic retry"
+        },
+        "retry_after_seconds": {
+          "type": ["integer", "null"]
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}

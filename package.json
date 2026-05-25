@@ -5,19 +5,47 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "remotion": "remotion studio remotion/index.ts",
+    "render:firstkeys:vertical": "remotion render remotion/index.ts FirstKeysIndy-Vertical out/FirstKeysIndy-vertical.mp4",
+    "render:firstkeys:square": "remotion render remotion/index.ts FirstKeysIndy-Square out/FirstKeysIndy-square.mp4",
+    "render:colvin:vertical": "remotion render remotion/index.ts ColvinEnterpriseStoryPromo out/colvin-enterprise-story-promo.mp4",
+    "render:colvin:wide": "remotion render remotion/index.ts ColvinEnterpriseStoryPromo-Wide out/colvin-enterprise-story-promo-wide.mp4",
+    "render:cinematic:vertical": "remotion render remotion/index.ts ColvinEnterpriseCinematicStory out/colvin-enterprise-cinematic-story.mp4",
+    "render:cinematic:wide": "remotion render remotion/index.ts ColvinEnterpriseCinematicStoryWide out/colvin-enterprise-cinematic-story-wide.mp4",
+    "render:daily": "npx ts-node --project remotion/tsconfig.json scripts/render-daily.ts",
+    "cron:setup": "bash scripts/setup-local-cron.sh",
+    "video:generate": "curl -s -X POST $NEXT_PUBLIC_APP_URL/api/daily-video -H 'Authorization: Bearer '$CRON_SECRET -H 'Content-Type: application/json'",
+    "orchestrator": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' scripts/test-orchestrator.ts",
+    "health-check": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' scripts/health-check.ts",
+    "self-audit": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' scripts/self-audit.ts",
+    "gabriel:daily": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/gabriel-daily-run.ts",
+    "render:json": "npx ts-node --project remotion/tsconfig.json scripts/render-video-json.ts",
+    "video:new": "echo 'Copy a JSON from /videos/ folder, edit it, then run: npm run render:json -- videos/your-video.json'",
+    "setup:db": "node scripts/apply-migration.js supabase/migrations/003_hermes_tables.sql"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.465",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.1",
+    "date-fns": "^4.3.0",
     "next": "16.2.6",
+    "openai": "^6.39.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "remotion": "^4.0.465",
+    "resend": "^6.12.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "pg": "^8.21.0",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5"
   }
 }

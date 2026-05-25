@@ -1,0 +1,29 @@
+{
+  "crons": [
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 13,23 * * *"
+    },
+    {
+      "path": "/api/daily-video",
+      "schedule": "0 9 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/scheduler/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/generate/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/video/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/daily-video/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/orchestrator/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

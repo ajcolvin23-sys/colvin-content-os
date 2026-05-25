@@ -1,0 +1,123 @@
+[
+  {
+    "name": null,
+    "company": "IHCDA",
+    "title": "Homeownership Programs Director",
+    "linkedin_url": null,
+    "lane": "first_keys_indy",
+    "fit_reason": "Oversees homeownership programs including down payment assistance, which is crucial for first_keys_indy's objectives.",
+    "qualification_score": 9,
+    "source_url": "https://www.in.gov/ihcda/homebuyers/programs/",
+    "source": "firecrawl_web:https://www.in.gov/ihcda/homebuyers/programs/"
+  },
+  {
+    "name": "Katie Votolato",
+    "company": "Indiana Kelley",
+    "title": "Workshop Leader",
+    "linkedin_url": null,
+    "lane": "colvin_enterprises",
+    "fit_reason": "Involved in a workshop that provides real-world context for business operations consulting.",
+    "qualification_score": 8,
+    "source_url": "https://kelley.iu.edu/undergraduate/academics/workshops/business-operations-consulting.html",
+    "source": "firecrawl_web:https://kelley.iu.edu/undergraduate/academics/workshops/business-operations-consulting.html"
+  },
+  {
+    "name": "Citizens Energy Group",
+    "company": "Citizens Energy Group",
+    "title": "Water Services",
+    "linkedin_url": null,
+    "lane": "indiana_backflow",
+    "fit_reason": "Citizens Energy Group provides essential water services including backflow prevention, making them a key player in the field.",
+    "qualification_score": 8,
+    "source_url": "https://info.citizensenergygroup.com/water/backflow-prevention",
+    "source": "firecrawl_web:https://info.citizensenergygroup.com/water/backflow-prevention"
+  },
+  {
+    "name": null,
+    "company": "INHP",
+    "title": "Down Payment Assistance Program Manager",
+    "linkedin_url": null,
+    "lane": "first_keys_indy",
+    "fit_reason": "Works directly with clients eligible for down payment assistance, relevant for first_keys_indy's target market.",
+    "qualification_score": 8,
+    "source_url": "https://www.inhp.org/mortgages/down-payment-assistance",
+    "source": "firecrawl_web:https://www.inhp.org/mortgages/down-payment-assistance"
+  },
+  {
+    "name": null,
+    "company": "Centric Consulting",
+    "title": "Consultant",
+    "linkedin_url": null,
+    "lane": "colvin_enterprises",
+    "fit_reason": "Local team helping navigate complex business processes.",
+    "qualification_score": 7,
+    "source_url": "https://centricconsulting.com/locations/indianapolis/",
+    "source": "firecrawl_web:https://centricconsulting.com/locations/indianapolis/"
+  },
+  {
+    "name": "Isley Plumbing",
+    "company": "Isley Plumbing",
+    "title": null,
+    "linkedin_url": null,
+    "lane": "indiana_backflow",
+    "fit_reason": "Isley Plumbing offers expert backflow testing and installation services, indicating a strong alignment with backflow prevention needs.",
+    "qualification_score": 7,
+    "source_url": "https://www.isleyplumbing.com/plumbing-services/backflow-testing/",
+    "source": "firecrawl_web:https://www.isleyplumbing.com/plumbing-services/backflow-testing/"
+  },
+  {
+    "name": "Sherri Garrison",
+    "company": "Eastern Star Church",
+    "title": "Director of Worship",
+    "linkedin_url": null,
+    "lane": "music_theory_secrets",
+    "fit_reason": "Experienced in gospel music and worship direction.",
+    "qualification_score": 7,
+    "source_url": "https://traditionalarts.indiana.edu/Resources/Archived%20Publication/TAI-Magazine-Fall-2011-food-4.8_Part2.pdf",
+    "source": "firecrawl_web:https://traditionalarts.indiana.edu/Resources/Archived%20Publication/TAI-Magazine-Fall-2011-food-4.8_Part2.pdf"
+  },
+  {
+    "name": "Jon Heynen",
+    "company": "Marion County",
+    "title": "Communications Officer",
+    "linkedin_url": null,
+    "lane": "first_keys_indy",
+    "fit_reason": "Involved in promoting down payment assistance programs which aligns with the services offered by first_keys_indy.",
+    "qualification_score": 7,
+    "source_url": "https://www.marioncountynews.org/news/down-payment-assistance-program-helps-families-become-homeowners",
+    "source": "firecrawl_web:https://www.marioncountynews.org/news/down-payment-assistance-program-helps-families-become-homeowners"
+  },
+  {
+    "name": null,
+    "company": "FHLBank Indianapolis",
+    "title": "Community Programs Manager",
+    "linkedin_url": null,
+    "lane": "first_keys_indy",
+    "fit_reason": "Manages down payment assistance initiatives, providing potential collaboration opportunities with first_keys_indy.",
+    "qualification_score": 7,
+    "source_url": "https://www.fhlbi.com/services/community-programs/launch/",
+    "source": "firecrawl_web:https://www.fhlbi.com/services/community-programs/launch/"
+  },
+  {
+    "name": null,
+    "company": "Compass Pointe CPAs, LLP",
+    "title": null,
+    "linkedin_url": null,
+    "lane": "colvin_enterprises",
+    "fit_reason": "Involved in business consulting services in Johnson County.",
+    "qualification_score": 6,
+    "source_url": "https://web.aspirejohnsoncounty.com/Business-Consulting",
+    "source": "firecrawl_web:https://web.aspirejohnsoncounty.com/Business-Consulting"
+  },
+  {
+    "name": null,
+    "company": "DSC Consulting",
+    "title": null,
+    "linkedin_url": null,
+    "lane": "colvin_enterprises",
+    "fit_reason": "Provides business consulting services in Southern Indy.",
+    "qualification_score": 6,
+    "source_url": "https://web.aspirejohnsoncounty.com/Business-Consulting",
+    "source": "firecrawl_web:https://web.aspirejohnsoncounty.com/Business-Consulting"
+  }
+]

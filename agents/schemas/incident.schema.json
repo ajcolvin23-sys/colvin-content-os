@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://colvin-content-os.vercel.app/schemas/incident.schema.json",
+  "title": "Incident",
+  "description": "Incident record for Colvin Content OS. Created by Hermes when P1/P2/P3 failures are detected.",
+  "type": "object",
+  "required": ["id", "run_id", "trace_id", "severity", "failed_stage", "cause", "error_message", "recommended_fix", "status", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The workflow run that triggered this incident"
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "The stage trace ID where failure occurred"
+    },
+    "workflow_name": {
+      "type": ["string", "null"],
+      "maxLength": 200
+    },
+    "agent": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Agent that was running when the incident occurred"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["P1", "P2", "P3"],
+      "description": "P1 = system down or data at risk, P2 = degraded function, P3 = minor issue"
+    },
+    "failed_stage": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "The pipeline stage that failed (e.g. 'lead_scoring', 'remotion_render')"
+    },
+    "cause": {
+      "type": "string",
+      "enum": [
+        "api_rate_limit",
+        "api_timeout",
+        "api_auth_failure",
+        "schema_validation_failure",
+        "policy_violation",
+        "duplicate_detected",
+        "missing_env_var",
+        "supabase_connection_failure",
+        "openai_quota_exceeded",
+        "firecrawl_failure",
+        "remotion_render_failure",
+        "telegram_failure",
+        "playwright_failure",
+        "circuit_breaker_open",
+        "data_quality_regression",
+        "missed_scheduled_run",
+        "manual_block",
+        "unknown"
+      ]
+    },
+    "error_message": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "error_code": {
+      "type": ["string", "null"],
+      "maxLength": 100
+    },
+    "stack_trace_summary": {
+      "type": ["string", "null"],
+      "maxLength": 2000,
+      "description": "Sanitized stack trace. No API keys or PII."
+    },
+    "recommended_fix": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Hermes recommended remediation steps"
+    },
+    "is_retryable": {
+      "type": "boolean",
+      "description": "Whether automatic retry is appropriate"
+    },
+    "retry_attempted": {
+      "type": "boolean",
+      "default": false
+    },
+    "replay_from_stage": {
+      "type": ["string", "null"],
+      "description": "If replay is appropriate, the stage to replay from"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "investigating", "mitigating", "resolved", "closed_no_action"]
+    },
+    "resolution_notes": {
+      "type": ["string", "null"],
+      "maxLength": 2000
+    },
+    "alert_sent_via": {
+      "type": ["string", "null"],
+      "enum": ["telegram", "email", "both", null],
+      "description": "How Alfred was notified"
+    },
+    "alert_sent_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolved_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}

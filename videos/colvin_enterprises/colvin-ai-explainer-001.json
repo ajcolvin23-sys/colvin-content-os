@@ -1,0 +1,91 @@
+{
+  "video_id": "colvin-ai-explainer-001",
+  "created_at": "2026-05-24T00:00:00Z",
+  "campaign": "AI Automation Awareness",
+  "brand": "colvin_enterprises",
+  "platform": "linkedin_video",
+  "format": "9:16",
+  "render_format": "9:16",
+  "title": "AI Employee Explainer — Indianapolis SMBs",
+  "audience": "Indianapolis small business owners and operations directors",
+  "goal": "Book a free AI audit call",
+  "hook": "Most businesses waste 20 hours a week on tasks AI can handle in minutes.",
+  "scenes": [
+    {
+      "id": "s1-hook",
+      "type": "hook",
+      "duration_seconds": 4,
+      "headline": "Most businesses waste 20 hours a week",
+      "emphasis": "20 hours",
+      "caption_text": "Most businesses waste 20 hours a week on tasks AI can automate.",
+      "motion": "zoom_in"
+    },
+    {
+      "id": "s2-problem",
+      "type": "problem",
+      "duration_seconds": 5,
+      "headline": "Manual follow-ups. Missed leads. Burned-out teams.",
+      "body": "You're doing work an AI employee should handle.",
+      "emphasis": "AI employee",
+      "caption_text": "Manual work is killing your growth.",
+      "motion": "slide_up"
+    },
+    {
+      "id": "s3-solution",
+      "type": "solution",
+      "duration_seconds": 6,
+      "headline": "Colvin Enterprises builds your AI employee.",
+      "emphasis": "AI employee",
+      "body": "We automate the repetitive. You focus on revenue.",
+      "caption_text": "We build AI systems that work while you sleep.",
+      "motion": "fade"
+    },
+    {
+      "id": "s4-step-1",
+      "type": "step",
+      "duration_seconds": 4,
+      "headline": "Step 1: We audit your current workflow",
+      "body": "Free 30-minute call. No pitch. Just clarity.",
+      "caption_text": "Step 1: Free workflow audit — no commitment.",
+      "motion": "slide_left"
+    },
+    {
+      "id": "s5-step-2",
+      "type": "step",
+      "duration_seconds": 4,
+      "headline": "Step 2: We build your custom automation",
+      "body": "Tailored to your business. Live in 2-4 weeks.",
+      "caption_text": "Step 2: Custom AI automation — live in weeks.",
+      "motion": "slide_left"
+    },
+    {
+      "id": "s6-proof",
+      "type": "proof",
+      "duration_seconds": 4,
+      "stat": "40%",
+      "stat_label": "Average time saved in the first 30 days",
+      "caption_text": "Clients save an average of 40% of manual work time.",
+      "motion": "fade"
+    },
+    {
+      "id": "s7-cta",
+      "type": "cta",
+      "duration_seconds": 5,
+      "headline": "Book your free AI audit today.",
+      "cta_text": "Book Free AI Audit",
+      "cta_url": "https://calendar.app.google/igj4Vfwvc1ZUB3Gc9",
+      "caption_text": "Book your free AI audit — link in bio.",
+      "motion": "fade"
+    }
+  ],
+  "voiceover_script": "Most businesses waste 20 hours a week on tasks AI can handle in minutes. Manual follow-ups. Missed leads. Burned-out teams. Colvin Enterprises builds your AI employee. We audit your workflow for free. Then we build your custom automation — live in 2 to 4 weeks. Clients save an average of 40% of manual work time. Book your free AI audit today at the link in bio.",
+  "music_direction": "Modern trap/hip-hop pulse — confident, forward-moving, not loud",
+  "thumbnail_concept": "Split screen: chaotic inbox on left, clean AI dashboard on right. Bold text overlay: 'Your AI Employee.'",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft"
+}

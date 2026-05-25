@@ -1,0 +1,86 @@
+{
+  "video_id": "firstkeys-dpa-explainer-001",
+  "created_at": "2026-05-24T00:00:00Z",
+  "campaign": "DPA Awareness — Marion County",
+  "brand": "first_keys_indy",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "title": "Down Payment Assistance Explainer — Marion County",
+  "audience": "Marion County first-time homebuyers with household income under $80k",
+  "goal": "Visit first-keys-indy.vercel.app to see if they may qualify",
+  "hook": "Did you know Marion County has programs that may help you buy your first home?",
+  "scenes": [
+    {
+      "id": "s1-hook",
+      "type": "hook",
+      "duration_seconds": 4,
+      "headline": "Marion County has programs that may help you buy your first home.",
+      "emphasis": "may help",
+      "caption_text": "Marion County has homebuyer assistance programs.",
+      "motion": "zoom_in"
+    },
+    {
+      "id": "s2-problem",
+      "type": "problem",
+      "duration_seconds": 4,
+      "headline": "The #1 barrier to homeownership: the down payment.",
+      "body": "Most first-time buyers don't know help is available.",
+      "emphasis": "down payment",
+      "caption_text": "The down payment stops most people. But it doesn't have to.",
+      "motion": "slide_up"
+    },
+    {
+      "id": "s3-solution",
+      "type": "solution",
+      "duration_seconds": 5,
+      "headline": "Down Payment Assistance programs may reduce what you pay upfront.",
+      "body": "Eligible buyers in Marion County may qualify for assistance.",
+      "caption_text": "DPA programs may reduce your upfront costs.",
+      "motion": "fade"
+    },
+    {
+      "id": "s4-slide",
+      "type": "slide",
+      "duration_seconds": 4,
+      "headline": "Who may qualify?",
+      "body": "First-time buyers. Marion County residents. Income guidelines apply.",
+      "caption_text": "Income guidelines and eligibility requirements apply.",
+      "motion": "slide_left"
+    },
+    {
+      "id": "s5-slide",
+      "type": "slide",
+      "duration_seconds": 4,
+      "headline": "Important: Approval is not guaranteed.",
+      "body": "Eligibility depends on your situation. Always work with a HUD-approved lender.",
+      "caption_text": "Results vary. Work with a HUD-approved lender.",
+      "background_override": "#0D2B1A",
+      "motion": "fade"
+    },
+    {
+      "id": "s6-cta",
+      "type": "cta",
+      "duration_seconds": 5,
+      "headline": "See if you may qualify today.",
+      "cta_text": "Check Eligibility",
+      "cta_url": "https://first-keys-indy.vercel.app",
+      "caption_text": "Visit first-keys-indy.vercel.app — link in bio.",
+      "motion": "fade"
+    }
+  ],
+  "voiceover_script": "Did you know Marion County has programs that may help you buy your first home? The number one barrier to homeownership is the down payment — and most first-time buyers don't even know help is available. Down Payment Assistance programs may reduce what you pay upfront. Eligible buyers in Marion County — who meet income guidelines — may qualify for assistance. Approval is not guaranteed. Results depend on your individual situation. Always work with a HUD-approved lender. Visit first-keys-indy dot vercel dot app to see if you may qualify.",
+  "music_direction": "Warm, hopeful, community-centered instrumental — not too fast",
+  "thumbnail_concept": "Front door of a home with keys in lock. Text overlay: 'You May Qualify.' Green brand accent.",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [
+      "Uses 'may qualify' consistently — compliant",
+      "HUD lender recommendation included — compliant",
+      "No specific dollar amounts claimed — compliant"
+    ],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft"
+}

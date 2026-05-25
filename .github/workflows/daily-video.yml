@@ -1,0 +1,91 @@
+# First Keys Indy — Daily Video Automation
+# Schedule: 10:00 UTC = 5:00am EST (M-F) — optimal for morning research + render
+#           15:00 UTC = 10:00am EST (weekends) — optimal posting window for weekends
+#
+# Pipeline:
+#   1. Trigger Vercel /api/daily-video (research + generate slides)
+#   2. Wait for content to be saved
+#   3. Render vertical + square MP4 via Remotion
+#   4. Upload to Google Drive via Composio
+#   5. Send Telegram notification to Alfred
+
+name: Daily First Keys Indy Video
+
+on:
+  schedule:
+    # 5am EST Mon-Fri
+    - cron: '0 10 * * 1-5'
+    # 10am EST Sat-Sun
+    - cron: '0 15 * * 0,6'
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  generate-and-render:
+    name: Generate Research + Render Video
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node.js setup ─────────────────────────────────────────────────────────
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── Install dependencies ──────────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Install ffmpeg ────────────────────────────────────────────────────────
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      # ── Ensure Remotion Chromium ──────────────────────────────────────────────
+      - name: Download Remotion browser
+        run: npx remotion browser ensure
+
+      # ── Step 1: Trigger content generation on Vercel ─────────────────────────
+      - name: Generate daily content (call Vercel API)
+        id: generate
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            "${{ secrets.NEXT_PUBLIC_APP_URL }}/api/daily-video" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "Response: $RESPONSE"
+          PROJECT_ID=$(echo $RESPONSE | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.project_id||'');")
+          echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+          echo "topic=$(echo $RESPONSE | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.topic||'Daily Video');")" >> $GITHUB_OUTPUT
+
+      # ── Step 2: Render videos ────────────────────────────────────────────────
+      - name: Render daily videos
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: npx ts-node --project remotion/tsconfig.json scripts/render-daily.ts
+
+      # ── Step 3: Upload artifacts (backup) ────────────────────────────────────
+      - name: Upload rendered videos as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-video-${{ github.run_id }}
+          path: out/daily-*.mp4
+          retention-days: 7
+
+      # ── Notify on failure ─────────────────────────────────────────────────────
+      - name: Notify failure via Telegram
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="⚠️ Daily video render FAILED for $(date '+%B %d'). Check GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -d parse_mode="HTML"

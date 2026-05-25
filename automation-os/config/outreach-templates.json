@@ -1,0 +1,28 @@
+{
+  "linkedin_connection": {
+    "max_chars": 300,
+    "colvin_enterprises": "Saw your work at {company} — impressive stuff. I help Indianapolis businesses automate their operations with AI. Would love to connect and trade ideas.",
+    "first_keys_indy": "Hi {name} — helping Marion County families navigate the homebuying process. Always glad to connect with folks working in the community.",
+    "music_theory_secrets": "Hey {name} — fellow musician here. I teach gospel piano theory and love connecting with church musicians. Would love to be in each other's network.",
+    "indiana_backflow": "Hi {name} — I run a contractor resource directory for Indiana. Always connecting with professionals in the trades. Would love to add you."
+  },
+  "linkedin_followup": {
+    "max_words": 150,
+    "colvin_enterprises": "Thanks for connecting, {name}.\n\nI've been working with a few Indianapolis businesses on automating their {pain_area} — cut their manual work by about 40% in most cases.\n\nCurious — is that something you're actively looking at for {company}, or is the timing not quite right yet?",
+    "first_keys_indy": "Thanks for connecting, {name}.\n\nI put together a quick guide on the DPA programs available in Marion County right now — happy to share if useful.\n\nAre you working with any first-time buyers currently, or more focused on {their_focus}?"
+  },
+  "variables": {
+    "{name}": "Lead's first name",
+    "{company}": "Lead's company name",
+    "{pain_area}": "Relevant pain point based on their title/industry",
+    "{their_focus}": "Their stated area of work from LinkedIn"
+  },
+  "forbidden_openers": [
+    "I hope this message finds you well",
+    "I noticed we share",
+    "I came across your profile",
+    "I'm reaching out because",
+    "Just wanted to",
+    "Following up on my previous message"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "routing_rules": {
+    "content_generation": {
+      "model": "gpt-4o",
+      "reason": "Quality required — brand voice, compliance, conversion",
+      "max_tokens": 2000,
+      "temperature": 0.7
+    },
+    "lead_scoring": {
+      "model": "gpt-4o-mini",
+      "reason": "Deterministic scoring — fast and cheap",
+      "max_tokens": 500,
+      "temperature": 0.2
+    },
+    "outreach_drafts": {
+      "model": "gpt-4o-mini",
+      "reason": "Short-form, templated — mini is sufficient",
+      "max_tokens": 500,
+      "temperature": 0.6
+    },
+    "seo_synthesis": {
+      "model": "gpt-4o",
+      "reason": "Strategic reasoning required for SEO recommendations",
+      "max_tokens": 1500,
+      "temperature": 0.5
+    },
+    "daily_report": {
+      "model": "gpt-4o-mini",
+      "reason": "Summarization — fast and cheap",
+      "max_tokens": 800,
+      "temperature": 0.3
+    },
+    "routing_decisions": {
+      "model": "gpt-4o-mini",
+      "reason": "Simple routing logic — deterministic",
+      "max_tokens": 200,
+      "temperature": 0.1
+    },
+    "qa_review": {
+      "model": "gpt-4o-mini",
+      "reason": "Structured checklist review — no creativity needed",
+      "max_tokens": 600,
+      "temperature": 0.2
+    },
+    "self_audit": {
+      "model": "gpt-4o",
+      "reason": "Semantic analysis of code quality — requires reasoning",
+      "max_tokens": 3000,
+      "temperature": 0.4
+    }
+  },
+  "cost_guardrails": {
+    "max_daily_openai_calls": 100,
+    "preferred_model_for_bulk": "gpt-4o-mini",
+    "escalate_to_gpt4o_when": ["content_generation", "seo_synthesis", "self_audit"]
+  }
+}

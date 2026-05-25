@@ -1,0 +1,123 @@
+[
+  {
+    "lead_name": null,
+    "lead_company": "IHCDA",
+    "lane": "first_keys_indy",
+    "message_type": "linkedin_connection",
+    "draft": "As the Homeownership Programs Director at IHCDA, your insights on down payment assistance are vital for empowering first-time homebuyers in Indianapolis. Let's connect to discuss how we can further support our community's homeownership goals.",
+    "priority_score": 9,
+    "compliance_flags": [],
+    "katrina_review_required": true,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": "Katie Votolato",
+    "lead_company": "Indiana Kelley",
+    "lane": "colvin_enterprises",
+    "message_type": "linkedin_connection",
+    "draft": "Katie, your work at Indiana Kelley in bridging theory and real-world business operations is vital for developing future leaders in our Indianapolis community. I'd love to connect and share insights on AI's role in enhancing consulting practices.",
+    "priority_score": 8,
+    "compliance_flags": [],
+    "katrina_review_required": false,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": "Citizens Energy Group",
+    "lead_company": "Citizens Energy Group",
+    "lane": "indiana_backflow",
+    "message_type": "linkedin_connection",
+    "draft": "As a fellow professional in Indiana's essential water services sector, I appreciate the critical role Citizens Energy Group plays in backflow prevention and community health.",
+    "priority_score": 8,
+    "compliance_flags": [],
+    "katrina_review_required": false,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": null,
+    "lead_company": "INHP",
+    "lane": "first_keys_indy",
+    "message_type": "linkedin_connection",
+    "draft": "Supporting first-time homebuyers with down payment assistance is crucial for our community's growth in Indianapolis. Let's connect to share insights and explore synergies.",
+    "priority_score": 8,
+    "compliance_flags": [],
+    "katrina_review_required": true,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": null,
+    "lead_company": "Centric Consulting",
+    "lane": "colvin_enterprises",
+    "message_type": "linkedin_connection",
+    "draft": "In the dynamic landscape of business process consulting, your insights are invaluable for organizations navigating complexity in Indianapolis. Let's connect to share knowledge and foster collaboration in our local community.",
+    "priority_score": 7,
+    "compliance_flags": [],
+    "katrina_review_required": false,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": "Isley Plumbing",
+    "lead_company": "Isley Plumbing",
+    "lane": "indiana_backflow",
+    "message_type": "linkedin_connection",
+    "draft": "Backflow prevention is crucial for maintaining safe water systems, and Isley Plumbing's expertise in this area is commendable. Let's connect to share insights on industry best practices in Indiana.",
+    "priority_score": 7,
+    "compliance_flags": [],
+    "katrina_review_required": false,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": "Sherri Garrison",
+    "lead_company": "Eastern Star Church",
+    "lane": "music_theory_secrets",
+    "message_type": "linkedin_connection",
+    "draft": "Your leadership in gospel music and worship at Eastern Star Church is inspiring and pivotal for our community's spiritual growth. I'd love to connect and share insights on how faith and creativity intersect in our work.",
+    "priority_score": 7,
+    "compliance_flags": [],
+    "katrina_review_required": false,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": "Jon Heynen",
+    "lead_company": "Marion County",
+    "lane": "first_keys_indy",
+    "message_type": "linkedin_connection",
+    "draft": "Promoting down payment assistance in Marion County is crucial for our community's growth, and I'd appreciate connecting to share insights on enhancing these programs.",
+    "priority_score": 7,
+    "compliance_flags": [],
+    "katrina_review_required": true,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": null,
+    "lead_company": "FHLBank Indianapolis",
+    "lane": "first_keys_indy",
+    "message_type": "linkedin_connection",
+    "draft": "Supporting down payment assistance initiatives is vital for enhancing homeownership in our community. Let’s connect to explore potential collaboration opportunities in Indianapolis.",
+    "priority_score": 7,
+    "compliance_flags": [],
+    "katrina_review_required": true,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": null,
+    "lead_company": "Compass Pointe CPAs, LLP",
+    "lane": "colvin_enterprises",
+    "message_type": "linkedin_connection",
+    "draft": "In the dynamic world of business consulting in Johnson County, I believe collaboration can lead to innovative solutions that benefit our community.",
+    "priority_score": 6,
+    "compliance_flags": [],
+    "katrina_review_required": false,
+    "status": "pending_review"
+  },
+  {
+    "lead_name": null,
+    "lead_company": "DSC Consulting",
+    "lane": "colvin_enterprises",
+    "message_type": "linkedin_connection",
+    "draft": "In the evolving landscape of business consulting in Southern Indy, collaboration can unlock new growth opportunities for us both. Let’s connect to explore how we can support each other’s missions.",
+    "priority_score": 6,
+    "compliance_flags": [],
+    "katrina_review_required": false,
+    "status": "pending_review"
+  }
+]

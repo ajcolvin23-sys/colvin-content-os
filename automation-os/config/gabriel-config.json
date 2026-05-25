@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-05-24",
+
+  "active_lanes": [
+    "colvin_enterprises",
+    "indiana_backflow",
+    "music_theory_secrets",
+    "first_keys_indy",
+    "funding_ready_indiana"
+  ],
+
+  "paused_lanes": [
+    "piano_app",
+    "youtube_music",
+    "girls_got_game",
+    "glory_engine"
+  ],
+
+  "lead_scout": {
+    "max_leads_per_lane_per_run": 10,
+    "min_qualification_score": 6,
+    "dedup_window_days": 30,
+    "sources_enabled": ["firecrawl_web", "linkedin_search", "directories"],
+    "firecrawl_enabled": true,
+    "fallback_on_empty": false,
+    "never_generate_fictional_leads": true
+  },
+
+  "outreach": {
+    "auto_send": false,
+    "require_alfred_approval": true,
+    "max_drafts_per_run": 20,
+    "linkedin_connection_max_chars": 300,
+    "linkedin_followup_max_words": 150,
+    "email_max_words": 300
+  },
+
+  "content": {
+    "auto_publish": false,
+    "require_alfred_approval": true,
+    "max_pieces_per_run": 5,
+    "platforms_enabled": ["linkedin", "instagram", "facebook"],
+    "video_scripts_per_run": 1
+  },
+
+  "review_thresholds": {
+    "outreach_queue_min_score": 7,
+    "auto_archive_score_below": 5,
+    "stale_pending_days": 3,
+    "carry_forward_min_score": 8
+  },
+
+  "model_routing": {
+    "content_generation": "gpt-4o",
+    "lead_scoring": "gpt-4o-mini",
+    "outreach_drafts": "gpt-4o-mini",
+    "seo_synthesis": "gpt-4o",
+    "daily_report": "gpt-4o-mini",
+    "routing_decisions": "gpt-4o-mini"
+  },
+
+  "notifications": {
+    "telegram_enabled": true,
+    "send_daily_brief": true,
+    "send_error_alerts": true,
+    "send_weekly_report": true,
+    "weekly_report_day": "friday"
+  },
+
+  "compliance": {
+    "katrina_gate_lanes": ["first_keys_indy", "funding_ready_indiana", "girls_got_game"],
+    "katrina_gate_keywords": ["guarantee", "guaranteed", "grant", "nonprofit", "legal", "investment", "minor", "youth", "donor", "HUD", "RESPA"],
+    "require_disclaimer_lanes": ["first_keys_indy", "funding_ready_indiana"]
+  },
+
+  "cron": {
+    "daily_run_utc": "0 13 * * *",
+    "weekly_audit_utc": "0 14 * * 5",
+    "github_actions_only": true,
+    "vercel_cron_disabled": true,
+    "local_cron_disabled": true
+  }
+}

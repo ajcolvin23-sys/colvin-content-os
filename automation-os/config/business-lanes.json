@@ -1,0 +1,124 @@
+{
+  "lanes": {
+    "colvin_enterprises": {
+      "name": "Colvin Enterprises",
+      "type": "B2B service",
+      "domain": "colvinenterprises.com",
+      "offer": "AI automation consulting for small-to-mid businesses",
+      "target_audience": "Business owners, ops directors, marketing managers — Indianapolis area",
+      "primary_cta": "Book a free AI audit call",
+      "booking_link": "https://calendar.app.google/igj4Vfwvc1ZUB3Gc9",
+      "compliance_rules": ["no exaggerated ROI claims", "no guaranteed client count"],
+      "content_voice": "Professional, results-focused, educational",
+      "active": true
+    },
+    "indiana_backflow": {
+      "name": "Indiana Backflow Directory",
+      "type": "Programmatic SEO / directory",
+      "domain": "indiana-backflow-directory.vercel.app",
+      "offer": "Find certified backflow testers by Indiana county",
+      "target_audience": "Property owners, plumbers, businesses needing annual backflow testing",
+      "primary_cta": "Find a tester in your county",
+      "compliance_rules": ["licensing claims must be accurate", "no legal advice"],
+      "content_voice": "Informational, local, trustworthy",
+      "active": true
+    },
+    "music_theory_secrets": {
+      "name": "Music Theory Secrets",
+      "type": "Info product / course",
+      "domain": "musictheorysecrets.com",
+      "offer": "Gospel piano method book — learn music theory through gospel",
+      "target_audience": "Church musicians, gospel piano players, beginners with ear training",
+      "primary_cta": "Get the book",
+      "compliance_rules": [],
+      "content_voice": "Encouraging, educational, faith-rooted, relatable",
+      "active": true
+    },
+    "piano_app": {
+      "name": "Piano App",
+      "type": "SaaS / mobile app",
+      "domain": "TBD",
+      "offer": "Adaptive piano learning app with quiz-based progression",
+      "target_audience": "Adult beginners, gospel piano enthusiasts",
+      "primary_cta": "Join the waitlist",
+      "compliance_rules": [],
+      "content_voice": "Modern, encouraging, curiosity-driven",
+      "active": false
+    },
+    "youtube_music": {
+      "name": "YouTube / Music Education",
+      "type": "Content channel",
+      "domain": "YouTube",
+      "offer": "Free gospel piano lessons and music theory content",
+      "target_audience": "Church musicians, piano learners, gospel music community",
+      "primary_cta": "Subscribe + watch next video",
+      "compliance_rules": [],
+      "content_voice": "Engaging, educational, conversational",
+      "active": false
+    },
+    "first_keys_indy": {
+      "name": "First Keys Indy",
+      "type": "Lead gen / community service",
+      "domain": "first-keys-indy.vercel.app",
+      "offer": "Help Marion County first-time homebuyers access down payment assistance",
+      "target_audience": "First-time homebuyers in Marion County, Indianapolis",
+      "primary_cta": "See if you qualify",
+      "compliance_rules": [
+        "Never guarantee DPA approval",
+        "Always say 'may qualify' not 'will qualify'",
+        "Always recommend HUD-approved lender",
+        "HUD/RESPA language required",
+        "Katrina review required for all public content"
+      ],
+      "content_voice": "Warm, community-centered, hopeful, transparent",
+      "active": true
+    },
+    "funding_ready_indiana": {
+      "name": "FundingReady Indiana",
+      "type": "Lead gen / consulting",
+      "domain": "TBD",
+      "offer": "Help Indiana small businesses find and apply for grants and funding",
+      "target_audience": "Small business owners in Indiana seeking grants, SBA loans, or funding",
+      "primary_cta": "Book a funding discovery call",
+      "compliance_rules": [
+        "No guarantee of funding approval",
+        "Legal disclaimer required on all content",
+        "Katrina review required for all public content"
+      ],
+      "content_voice": "Professional, hopeful, practical, transparent",
+      "active": true
+    },
+    "girls_got_game": {
+      "name": "Girls Got Game",
+      "type": "Nonprofit / program",
+      "domain": "TBD",
+      "offer": "Youth sports and leadership program for girls in Indianapolis",
+      "target_audience": "Parents, coaches, school administrators, donors — Indianapolis",
+      "primary_cta": "Get involved / donate",
+      "compliance_rules": [
+        "Youth-safe content only",
+        "No PII for minors",
+        "Nonprofit tone — never commercial",
+        "Katrina review required for ALL content",
+        "Outreach to adults only (parents, coaches, administrators)"
+      ],
+      "content_voice": "Inspirational, community-focused, impact-driven",
+      "active": false
+    },
+    "glory_engine": {
+      "name": "GloryEngine / Yahweh Comics",
+      "type": "Faith media / creator",
+      "domain": "TBD",
+      "offer": "Faith-based media, comics, and content celebrating Yahweh",
+      "target_audience": "Faith community, comic readers, Christian media consumers",
+      "primary_cta": "Follow + read the latest",
+      "compliance_rules": [
+        "Faith-aligned messaging only",
+        "Positive, uplifting content — no controversy",
+        "No political positions"
+      ],
+      "content_voice": "Bold, creative, faith-rooted, celebratory",
+      "active": false
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://colvincontentOS/remotion-video-script.schema.json",
+  "title": "VideoScript",
+  "description": "Gabriel generates this. Remotion renders it. No React code per video.",
+  "type": "object",
+  "required": ["video_id", "brand", "platform", "format", "title", "audience", "goal", "hook", "scenes", "render_format", "claims_check", "approval_required", "render_status"],
+  "properties": {
+    "video_id":     { "type": "string", "description": "Unique ID. Format: {brand}-{topic}-{NNN}", "examples": ["colvin-ai-explainer-001"] },
+    "created_at":   { "type": "string", "format": "date-time" },
+    "campaign":     { "type": "string" },
+
+    "brand": {
+      "type": "string",
+      "enum": ["colvin_enterprises", "first_keys_indy", "indiana_backflow", "music_theory_secrets", "piano_app", "funding_ready_indiana", "girls_got_game", "glory_engine"]
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["tiktok", "youtube_shorts", "instagram_reels", "facebook_reels", "linkedin_video", "slideshow", "promo"]
+    },
+    "format": {
+      "type": "string",
+      "enum": ["9:16", "1:1", "16:9"]
+    },
+
+    "title":    { "type": "string" },
+    "audience": { "type": "string" },
+    "goal":     { "type": "string" },
+    "hook":     { "type": "string", "description": "First 3 seconds. Must stop the scroll. Max 100 chars.", "maxLength": 100 },
+
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "duration_seconds"],
+        "properties": {
+          "id":               { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["hook", "problem", "solution", "proof", "step", "slide", "cta", "logo_intro", "lower_third", "countdown"]
+          },
+          "duration_seconds": { "type": "number", "minimum": 1, "maximum": 30 },
+          "headline":         { "type": "string", "maxLength": 80 },
+          "body":             { "type": "string", "maxLength": 200 },
+          "emphasis":         { "type": "string", "description": "Word/phrase to highlight in accent color" },
+          "caption_text":     { "type": "string", "maxLength": 150 },
+          "stat":             { "type": "string", "description": "Big number for proof scenes, e.g. '40%'" },
+          "stat_label":       { "type": "string" },
+          "cta_text":         { "type": "string", "maxLength": 60 },
+          "cta_url":          { "type": "string", "format": "uri" },
+          "motion": {
+            "type": "string",
+            "enum": ["fade", "slide_up", "slide_left", "zoom_in", "none"]
+          },
+          "transition": {
+            "type": "string",
+            "enum": ["fade", "wipe", "cut", "none"]
+          },
+          "background_override": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "description"],
+              "properties": {
+                "type": { "type": "string", "enum": ["image", "icon", "background", "lottie"] },
+                "description": { "type": "string" },
+                "url": { "type": "string", "format": "uri" },
+                "fallback_color": { "type": "string" }
+              }
+            }
+          },
+          "voiceover": { "type": "string" }
+        }
+      }
+    },
+
+    "voiceover_script": { "type": "string" },
+    "music_direction":  { "type": "string" },
+    "captions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text", "startFrame", "endFrame"],
+        "properties": {
+          "text":       { "type": "string" },
+          "startFrame": { "type": "integer", "minimum": 0 },
+          "endFrame":   { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+
+    "thumbnail_concept": { "type": "string" },
+    "render_format": {
+      "type": "string",
+      "enum": ["9:16", "1:1", "16:9"]
+    },
+
+    "claims_check": {
+      "type": "object",
+      "required": ["risk_level", "issues", "reviewed"],
+      "properties": {
+        "risk_level": { "type": "string", "enum": ["low", "medium", "high"] },
+        "issues":     { "type": "array", "items": { "type": "string" } },
+        "reviewed":   { "type": "boolean" }
+      }
+    },
+
+    "approval_required": { "type": "boolean" },
+    "approved_by":        { "type": "string" },
+    "approved_at":        { "type": "string", "format": "date-time" },
+
+    "render_status": {
+      "type": "string",
+      "enum": ["draft", "approved", "rendering", "rendered", "failed"]
+    }
+  }
+}
