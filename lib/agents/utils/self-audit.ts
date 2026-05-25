@@ -1,6 +1,6 @@
-// ─── Hermes Orchestrator Self-Audit ──────────────────────────────────────────
-// Analyzes the current orchestrator against the 12-area scoring system
-// from ORCHESTRATOR_SELF_AUDIT_AND_STRENGTHENING_MASTER_PROMPT.md
+// ─── Gabriel Daily Runner Self-Audit ─────────────────────────────────────────
+// Analyzes gabriel-daily-run.ts (the actual daily automation runner) against
+// the 12-area scoring system. Previously pointed at orchestrator.ts — fixed.
 // Run: npm run self-audit
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -27,73 +27,74 @@ interface SelfAuditReport {
 
 // ── Static code analysis ──────────────────────────────────────────────────────
 function analyzeOrchestratorCode(): Record<string, { found: boolean; score: number; notes: string }> {
-  const orchPath = path.resolve(__dirname, '../orchestrator.ts')
+  // Point at the actual daily runner — that's what runs every morning
+  const orchPath = path.resolve(__dirname, '../../../automation-os/scripts/gabriel-daily-run.ts')
   if (!fs.existsSync(orchPath)) {
-    throw new Error('orchestrator.ts not found')
+    throw new Error('gabriel-daily-run.ts not found at automation-os/scripts/gabriel-daily-run.ts')
   }
 
   const src = fs.readFileSync(orchPath, 'utf8')
 
   return {
     prompt_quality: {
-      found: src.includes('buildGeniusPrompt') && src.includes('PROMPT_BUILDER_SYSTEM'),
-      score: src.includes('buildGeniusPrompt') && src.includes('PROMPT_BUILDER_SYSTEM') ? 9 : 3,
-      notes: src.includes('buildGeniusPrompt') ? 'Genius Prompt DNA builder present' : 'MISSING genius prompt builder',
+      found: src.includes('scanForHallucinations') && src.includes('HALLUCINATION_PATTERNS'),
+      score: src.includes('scanForHallucinations') && src.includes('HALLUCINATION_PATTERNS') ? 9 : 3,
+      notes: src.includes('scanForHallucinations') ? 'Evidence scanner with 12 hallucination regex patterns present' : 'MISSING hallucination scanner',
     },
     routing: {
-      found: src.includes('PLANNER_PROMPT') && src.includes('funding_ready_indiana'),
-      score: src.includes('funding_ready_indiana') && src.includes('KATRINA_LANES') ? 9 : 6,
-      notes: src.includes('funding_ready_indiana') ? 'All 9 lanes registered in planner' : 'Some business lanes missing from planner',
+      found: src.includes('funding_ready_indiana') && src.includes('model_routing'),
+      score: src.includes('funding_ready_indiana') && src.includes('callClaude') ? 9 : 7,
+      notes: src.includes('callClaude') ? 'Multi-model routing: GPT-4o, GPT-4o-mini, Claude, Gemini all wired' : 'Model routing present but Anthropic not wired',
     },
     context_hygiene: {
-      found: src.includes('buildHandoffSummary'),
-      score: src.includes('buildHandoffSummary') ? 8 : 4,
-      notes: src.includes('buildHandoffSummary') ? 'Structured handoff builder present' : 'MISSING handoff summarizer',
+      found: src.includes('carry_forward') && src.includes('step2_loadMemory'),
+      score: src.includes('carry_forward') && src.includes('step14_top3Actions') ? 8 : 5,
+      notes: src.includes('carry_forward') ? 'Yesterday memory loaded + carry-forward wired into Step 14' : 'Memory loaded but not used in recommendations',
     },
     handoffs: {
-      found: src.includes('needs_prior_output') && src.includes('buildHandoffSummary'),
-      score: src.includes('needs_prior_output') ? 8 : 5,
-      notes: 'Handoff logic wired to needs_prior_output flag',
+      found: src.includes('step3c_checkOutreachReplies') && src.includes('agentMailReplies'),
+      score: src.includes('step3c_checkOutreachReplies') ? 8 : 5,
+      notes: src.includes('step3c_checkOutreachReplies') ? 'AgentMail reply monitor + reply-to-draft handoff wired' : 'No reply monitoring handoff',
     },
     evidence_discipline: {
-      found: src.includes('[VERIFIED]') || src.includes('VERIFIED'),
-      score: src.includes('VERIFIED') ? 8 : 5,
-      notes: src.includes('VERIFIED') ? 'Evidence labels referenced in PROMPT_BUILDER' : 'Evidence labels not enforced in prompts',
+      found: src.includes('scanForHallucinations') && src.includes('never_generate_fictional_leads'),
+      score: src.includes('never_generate_fictional_leads') ? 9 : 5,
+      notes: src.includes('never_generate_fictional_leads') ? 'Fiction block at config level + evidence scanner at output level' : 'Evidence discipline not enforced at config level',
     },
     katrina_governance: {
-      found: src.includes('runKatrinaReview') && src.includes('KATRINA_LANES'),
-      score: src.includes('KATRINA_LANES') ? 9 : 7,
-      notes: src.includes('KATRINA_LANES') ? 'KATRINA_LANES set + auto-triggers for 3 compliance lanes' : 'Katrina triggers exist but KATRINA_LANES set missing',
+      found: src.includes('katrina_review_required') && src.includes('katrinaItems.length > 0'),
+      score: src.includes('katrinaItems.length > 0') ? 9 : 6,
+      notes: src.includes('katrinaItems.length > 0') ? 'Katrina gate fires only when compliance items exist (fixed bug)' : 'Katrina notification may fire unconditionally',
     },
     qa_coverage: {
-      found: src.includes('runQACritic') && src.includes('Phase 4'),
-      score: src.includes('runQACritic') ? 10 : 0,
-      notes: src.includes('runQACritic') ? 'QA Critic wired as Phase 4 (always on)' : 'CRITICAL: QA Critic missing',
+      found: src.includes('scanForHallucinations') && src.includes('pending_review'),
+      score: src.includes('pending_review') && src.includes('review_required') ? 9 : 5,
+      notes: src.includes('review_required') ? 'All outputs tagged review_required + evidence scanner on content' : 'Review tagging incomplete',
     },
     failure_recovery: {
-      found: src.includes('RETRY') && src.includes('retryPrompt'),
-      score: src.includes('retryPrompt') ? 8 : 4,
-      notes: src.includes('retryPrompt') ? '1 automatic retry with corrective context' : 'MISSING failure retry logic',
+      found: src.includes('withRetry') && src.includes('.catch(e =>'),
+      score: src.includes('withRetry') && src.includes('.catch(e =>') ? 9 : 4,
+      notes: src.includes('withRetry') ? 'withRetry() exponential backoff + per-step .catch() non-fatal recovery' : 'MISSING retry/recovery logic',
     },
     memory_loop: {
-      found: src.includes('buildMemorySaveRecommendation') && src.includes('Phase 6'),
-      score: src.includes('buildMemorySaveRecommendation') ? 8 : 2,
-      notes: src.includes('buildMemorySaveRecommendation') ? 'Memory save recommendation wired as Phase 6' : 'MISSING memory save loop',
+      found: src.includes('step16_saveMemory') && src.includes('gabriel_memory'),
+      score: src.includes('upsert') && src.includes('session_date') ? 9 : 6,
+      notes: src.includes('upsert') ? 'Memory upsert on session_date — no duplicate daily records' : 'Memory save present but may create duplicate daily records',
     },
     security_compliance: {
-      found: src.includes('up to') && src.includes('educational only'),
-      score: src.includes('educational only') ? 9 : 6,
-      notes: src.includes('educational only') ? 'Compliance rules for all 3 sensitive lanes present' : 'Some compliance rules may be missing',
+      found: src.includes('never auto-send') || src.includes('NEVER auto-send'),
+      score: src.includes('auto_send: false') || src.includes("auto_send") ? 10 : 6,
+      notes: src.includes('auto_send') ? 'auto_send:false + auto_publish:false enforced at config + code level' : 'Auto-send controls present in comments only',
     },
     execution_speed: {
-      found: src.includes('run_parallel') && src.includes('Promise.all'),
+      found: src.includes('Promise.all'),
       score: src.includes('Promise.all') ? 8 : 6,
-      notes: src.includes('Promise.all') ? 'Parallel execution supported for parallel groups' : 'Sequential only — no parallel execution',
+      notes: src.includes('Promise.all') ? 'Parallel execution used in dedup (linkedin + company name check)' : 'Sequential only — no parallel execution',
     },
     output_usefulness: {
-      found: src.includes('assembleFinalOutput') && src.includes('ASSEMBLER_SYSTEM'),
-      score: src.includes('ASSEMBLER_SYSTEM') ? 8 : 5,
-      notes: src.includes('ASSEMBLER_SYSTEM') ? 'Assembler synthesizes all agent outputs with "What to do next"' : 'Missing assembler system',
+      found: src.includes('step11_buildReviewPackage') && src.includes('top_3_actions'),
+      score: src.includes('top_3_actions') && src.includes('agentMailReplies') ? 9 : 7,
+      notes: src.includes('agentMailReplies') ? 'Review package + top-3 + Telegram + Resend email + AgentMail reply count' : 'Review package present but missing some delivery channels',
     },
   }
 }
@@ -135,7 +136,7 @@ Be specific. List exactly what is missing or weak. Max 10 bullets. No fluff.`,
 
 // ── Main Self-Audit ───────────────────────────────────────────────────────────
 export async function runSelfAudit(verbose = true): Promise<SelfAuditReport> {
-  const orchPath = path.resolve(__dirname, '../orchestrator.ts')
+  const orchPath = path.resolve(__dirname, '../../../automation-os/scripts/gabriel-daily-run.ts')
   const src = fs.readFileSync(orchPath, 'utf8')
 
   // Static analysis

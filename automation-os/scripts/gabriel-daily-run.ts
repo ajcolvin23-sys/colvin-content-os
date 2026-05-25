@@ -260,6 +260,60 @@ async function callGPT(
   }
 }
 
+// ── Claude Helper (Anthropic — claude-haiku-3-5 for fast analysis) ────────────
+// Used for: deduplication verification, categorization, score cross-check
+// Falls back to gpt-4o-mini if ANTHROPIC_API_KEY not set
+async function callClaude(
+  prompt: string,
+  opts?: { taskType?: string; lane?: string; model?: string }
+): Promise<string> {
+  if (!ANTHROPIC_API_KEY) {
+    return callGPT('gpt-4o-mini', 'You are a helpful assistant.', prompt, opts);
+  }
+  const model = opts?.model || 'claude-haiku-3-5';
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      model,
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const req = https.request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          const text = parsed.content?.[0]?.text ?? '';
+          logAIUsage({
+            provider: 'anthropic', model,
+            taskType: opts?.taskType || 'general', lane: opts?.lane,
+            inputTokens: parsed.usage?.input_tokens || 0,
+            outputTokens: parsed.usage?.output_tokens || 0,
+            durationMs: Date.now() - start,
+            status: text ? 'success' : 'empty_response',
+          }).catch(() => {});
+          resolve(text);
+        } catch { resolve(''); }
+      });
+    });
+    req.on('error', () => resolve(''));
+    req.setTimeout(20000, () => { req.destroy(); resolve(''); });
+    req.write(body);
+    req.end();
+  });
+}
+
 // ── Gemini Helper (free tier — fallback to GPT-4o-mini if no key) ─────────────
 async function callGemini(
   prompt: string,
@@ -332,6 +386,27 @@ const SOLOMON_SEO_QUERIES: Record<string, string[]> = {
     'Indiana small business grant program 2024 2025 IEDC',
     'business funding Indianapolis minority owned small business',
     'Indiana SBDC grant loan program Indianapolis entrepreneur',
+  ],
+  // Paused lanes — queries ready for when they reactivate
+  piano_app: [
+    'adaptive piano learning app church musician gospel',
+    'best piano learning app adults beginners gospel jazz',
+    'piano app for worship leaders church musicians review',
+  ],
+  youtube_music: [
+    'gospel piano YouTube channel music theory church musicians',
+    'music theory YouTube channel worship leaders Indiana',
+    'gospel music education YouTube growth strategy 2025',
+  ],
+  girls_got_game: [
+    'youth sports leadership program Indianapolis girls nonprofit',
+    'girls basketball leadership program Indianapolis Indiana',
+    'youth development nonprofit Indianapolis Marion County funding',
+  ],
+  glory_engine: [
+    'faith-based media creator economy Christian content 2025',
+    'Christian comic book Yahweh faith storytelling creator',
+    'faith-based YouTube content monetization strategy 2025',
   ],
 };
 
@@ -596,7 +671,14 @@ Max ${config.lead_scout.max_leads_per_lane_per_run} prospects.`;
         `Web research for ${lane} lane:\n\n${scrapedContext}`
       );
 
-      const extractedRaw = JSON.parse(extractResponse.replace(/```json|```/g, '').trim());
+      let extractedRaw: unknown;
+      try {
+        extractedRaw = JSON.parse(extractResponse.replace(/```json|```/g, '').trim());
+      } catch {
+        console.log(`  ${lane}: JSON parse error on lead extraction — skipping lane`);
+        SKIPPED_LANES.push({ lane, reason: 'JSON parse error on lead extraction', query });
+        continue;
+      }
       const extracted: Array<{name:string|null;company:string;title:string|null;linkedin_url:string|null;fit_reason:string;source_url:string}> =
         Array.isArray(extractedRaw) ? extractedRaw : [];
 
@@ -646,8 +728,14 @@ Return JSON array matching the input order: [{ source_credibility, contact_speci
         `Score these ${extracted.length} prospects:\n${extracted.map((p, i) => `${i+1}. ${p.name ?? '[no name]'}, ${p.title ?? '[no title]'} at ${p.company} — ${p.fit_reason}`).join('\n')}`
       );
 
-      const scores = JSON.parse(scoreResponse.replace(/```json|```/g, '').trim());
-      const scoresArray = Array.isArray(scores) ? scores : [];
+      let scoresRaw: unknown;
+      try {
+        scoresRaw = JSON.parse(scoreResponse.replace(/```json|```/g, '').trim());
+      } catch {
+        console.log(`  ${lane}: JSON parse error on scoring — using default scores`);
+        scoresRaw = [];
+      }
+      const scoresArray = Array.isArray(scoresRaw) ? scoresRaw : [];
 
       // Merge extraction + independent scores
       const taggedLeads: Lead[] = extracted
@@ -1035,6 +1123,62 @@ Return JSON: { draft: string, character_count: number }`;
         katrina_review_required: isKatrinaLane,
       } as ContentDraft & { katrina_review_required?: boolean });
     }
+
+    // ── Generate Instagram + Facebook variants from the LinkedIn post ─────────
+    if (drafts.length > 0) {
+      const linkedinDraft = drafts[drafts.length - 1].draft;
+
+      // Instagram: shorter, hook-first, 5 hashtags, visual CTA
+      try {
+        const igResponse = await callGPT(
+          config.model_routing.content_generation,
+          `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Instagram.
+Rules: Under 300 chars main caption + line break + 5 relevant hashtags. Hook must work without context.
+No corporate speak. Punchy, visual language. Same lane: ${targetLane}.
+Return JSON: { draft: string }`,
+          `LinkedIn post to adapt:\n${linkedinDraft.slice(0, 600)}`,
+          { taskType: 'content_generation', lane: targetLane, maxTokens: 400 }
+        );
+        const igParsed = JSON.parse(igResponse.replace(/```json|```/g, '').trim());
+        const igDraft = igParsed.draft ?? '';
+        if (igDraft && scanForHallucinations(igDraft).length === 0) {
+          drafts.push({
+            lane: targetLane, platform: 'instagram', content_type: 'caption',
+            draft: igDraft, character_count: igDraft.length,
+            review_required: true, status: 'pending_review',
+            katrina_review_required: isKatrinaLane,
+          } as ContentDraft & { katrina_review_required?: boolean });
+        }
+      } catch { /* non-fatal */ }
+
+      // Facebook: community-focused, slightly longer, ends with a question
+      try {
+        const fbResponse = await callGPT(
+          config.model_routing.content_generation,
+          `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Facebook.
+Rules: Community-friendly tone, under 500 chars, end with a genuine question to spark comments.
+Alfred's audience on Facebook: Indianapolis locals, faith community, first-time entrepreneurs.
+Same lane: ${targetLane}.
+Return JSON: { draft: string }`,
+          `LinkedIn post to adapt:\n${linkedinDraft.slice(0, 600)}`,
+          { taskType: 'content_generation', lane: targetLane, maxTokens: 400 }
+        );
+        const fbParsed = JSON.parse(fbResponse.replace(/```json|```/g, '').trim());
+        const fbDraft = fbParsed.draft ?? '';
+        if (fbDraft && scanForHallucinations(fbDraft).length === 0) {
+          drafts.push({
+            lane: targetLane, platform: 'facebook', content_type: 'post',
+            draft: fbDraft, character_count: fbDraft.length,
+            review_required: true, status: 'pending_review',
+            katrina_review_required: isKatrinaLane,
+          } as ContentDraft & { katrina_review_required?: boolean });
+        }
+      } catch { /* non-fatal */ }
+
+      if (drafts.length > 1) {
+        console.log(`  Platform variants generated: LinkedIn + Instagram + Facebook`);
+      }
+    }
   } catch (err) {
     console.log(`  Content gen failed: ${String(err).slice(0, 80)}`);
   }
@@ -1211,24 +1355,42 @@ async function step8_dedup(leads: Lead[]): Promise<Lead[]> {
   console.log(`\n[Step 8] Deduplicating ${leads.length} leads against Supabase CRM...`);
 
   try {
-    const linkedinUrls = leads.map(l => l.linkedin_url).filter(Boolean);
-    const { data: existing } = await supabase
-      .from('leads')
-      .select('linkedin_url, last_contacted_at')
-      .in('linkedin_url', linkedinUrls as string[]);
+    // Track recently-contacted leads by two keys: linkedin_url AND company name
+    // This catches org/referral_source leads that never have a linkedin_url
+    const linkedinUrls = leads.map(l => l.linkedin_url).filter(Boolean) as string[];
+    const companyNames  = leads.map(l => l.company).filter(Boolean) as string[];
 
-    const recentlyContacted = new Set<string>(
-      (existing ?? [])
-        .filter(r => {
-          if (!r.last_contacted_at) return false;
-          const daysSince = (Date.now() - new Date(r.last_contacted_at).getTime()) / (1000 * 60 * 60 * 24);
-          return daysSince < 30;
-        })
-        .map(r => r.linkedin_url)
+    const [linkedinResult, companyResult] = await Promise.all([
+      linkedinUrls.length > 0
+        ? supabase.from('leads').select('linkedin_url, company, last_contacted_at').in('linkedin_url', linkedinUrls)
+        : Promise.resolve({ data: [] }),
+      companyNames.length > 0
+        ? supabase.from('leads').select('linkedin_url, company, last_contacted_at').in('company', companyNames)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30-day window
+
+    const recentLinkedins = new Set<string>(
+      (linkedinResult.data ?? [])
+        .filter(r => r.last_contacted_at && new Date(r.last_contacted_at).getTime() > cutoff)
+        .map(r => r.linkedin_url).filter(Boolean)
     );
 
-    const unique = leads.filter(l => !l.linkedin_url || !recentlyContacted.has(l.linkedin_url));
-    console.log(`  After dedup: ${unique.length} unique leads (removed ${leads.length - unique.length} duplicates)`);
+    const recentCompanies = new Set<string>(
+      (companyResult.data ?? [])
+        .filter(r => r.last_contacted_at && new Date(r.last_contacted_at).getTime() > cutoff)
+        .map(r => r.company).filter(Boolean)
+    );
+
+    const unique = leads.filter(l => {
+      // Person with LinkedIn URL: dedup by URL
+      if (l.linkedin_url) return !recentLinkedins.has(l.linkedin_url);
+      // Org/referral with no URL: dedup by company name
+      return !recentCompanies.has(l.company);
+    });
+
+    console.log(`  After dedup: ${unique.length} unique leads (removed ${leads.length - unique.length} duplicates — linkedin + company name check)`);
     return unique;
   } catch {
     console.log('  Dedup: leads table not found — skipping (no duplicates removed)');
@@ -1325,7 +1487,8 @@ async function step12_saveOutputs(
   leads: Lead[],
   outreachDrafts: OutreachDraft[],
   contentDrafts: ContentDraft[],
-  seoReports: SolomonSEOReport[] = []
+  seoReports: SolomonSEOReport[] = [],
+  marketingRecs: string[] = []
 ): Promise<void> {
   console.log('\n[Step 12] Saving outputs to Supabase and data folders...');
 
@@ -1369,25 +1532,37 @@ async function step12_saveOutputs(
     console.log(`  Supabase leads save skipped: ${String(err).slice(0, 80)}`);
   }
 
-  // Save outreach drafts to Supabase
+  // Save outreach drafts to Supabase (idempotent — skip if this run already saved)
   try {
     if (outreachDrafts.length > 0) {
-      const { error } = await supabase.from('outreach_drafts').insert(
-        outreachDrafts.map(d => ({
-          lead_name: d.lead_name ?? '[Contact]',
-          lead_company: d.lead_company,
-          lane: d.lane,
-          message_type: d.message_type,
-          draft: d.draft,
-          priority_score: d.priority_score,
-          compliance_flags: d.compliance_flags,
-          katrina_review_required: d.katrina_review_required,
-          status: 'pending_review',
-          created_at: new Date().toISOString(),
-        }))
-      );
-      if (error) console.log(`  Supabase outreach save warning: ${error.message}`);
-      else console.log(`  Saved ${outreachDrafts.length} outreach drafts to Supabase`);
+      // Guard: don't double-insert on same-day re-runs
+      const { data: alreadySaved } = await supabase
+        .from('outreach_drafts')
+        .select('id')
+        .eq('run_id', RUN_ID)
+        .limit(1);
+
+      if (alreadySaved && alreadySaved.length > 0) {
+        console.log(`  Outreach drafts already saved for run ${RUN_ID} — skipping`);
+      } else {
+        const { error } = await supabase.from('outreach_drafts').insert(
+          outreachDrafts.map(d => ({
+            run_id: RUN_ID,
+            lead_name: d.lead_name ?? '[Contact]',
+            lead_company: d.lead_company,
+            lane: d.lane,
+            message_type: d.message_type,
+            draft: d.draft,
+            priority_score: d.priority_score,
+            compliance_flags: d.compliance_flags,
+            katrina_review_required: d.katrina_review_required,
+            status: 'pending_review',
+            created_at: new Date().toISOString(),
+          }))
+        );
+        if (error) console.log(`  Supabase outreach save warning: ${error.message}`);
+        else console.log(`  Saved ${outreachDrafts.length} outreach drafts to Supabase`);
+      }
     }
   } catch (err) {
     console.log(`  Supabase outreach save skipped: ${String(err).slice(0, 80)}`);
@@ -1413,6 +1588,28 @@ async function step12_saveOutputs(
       else console.log(`  Saved ${seoReports.length} SEO reports to Supabase`);
     } catch (err) {
       console.log(`  SEO reports save skipped: ${String(err).slice(0, 80)}`);
+    }
+  }
+
+  // Save marketing recommendations to Supabase as queryable records
+  if (marketingRecs.length > 0) {
+    try {
+      const dayOfWeek = new Date().getDay();
+      const focusLane = leads[0]?.lane || 'colvin_enterprises';
+      const recItems = marketingRecs.map((rec, i) => ({
+        run_id: RUN_ID,
+        lane: focusLane,
+        rank: i + 1,
+        recommendation: rec,
+        source: 'genius',
+        status: 'pending_review',
+        created_at: new Date().toISOString(),
+      }));
+      const { error: recError } = await supabase.from('marketing_recommendations').insert(recItems);
+      if (recError) console.log(`  Marketing recs Supabase warning: ${recError.message}`);
+      else console.log(`  Saved ${recItems.length} marketing recommendations to Supabase`);
+    } catch (err) {
+      console.log(`  Marketing recs save skipped: ${String(err).slice(0, 80)}`);
     }
   }
 
@@ -1473,11 +1670,22 @@ async function step14_top3Actions(
   outreachDrafts: OutreachDraft[],
   contentDrafts: ContentDraft[],
   seoOpportunities: string[],
-  config: GabrielConfig
+  config: GabrielConfig,
+  carryForward: unknown[] = []
 ): Promise<Array<{ rank: number; action: string; lane: string; why: string; effort: string }>> {
   console.log('\n[Step 14] Identifying top 3 actions...');
 
   try {
+    // Include yesterday's unfinished high-priority items so they don't get buried
+    const carryForwardContext = carryForward.length > 0
+      ? `\n\nYESTERDAY'S UNFINISHED HIGH-PRIORITY ITEMS (carry-forward — consider including if still relevant):\n${
+          carryForward.slice(0, 3).map((c: unknown) => {
+            const item = c as Record<string, unknown>;
+            return `- ${item.type || 'item'}: ${item.company || ''} (${item.lane || ''}, score: ${item.score || '?'})`;
+          }).join('\n')
+        }`
+      : '';
+
     const context = [
       outreachDrafts.length > 0 ? `${outreachDrafts.length} outreach drafts ready for review` : '',
       contentDrafts.length > 0 ? `${contentDrafts.length} content pieces ready for review` : '',
@@ -1487,7 +1695,7 @@ async function step14_top3Actions(
     const response = await callGPT(
       config.model_routing.daily_report,
       'You identify the top 3 highest-ROI actions for Alfred Colvin today. Be specific. Return JSON array of 3 items: { rank, action, lane, why, effort (low|medium|high) }',
-      `Available today: ${context}. Active lanes: ${config.active_lanes.join(', ')}.`
+      `Available today: ${context}. Active lanes: ${config.active_lanes.join(', ')}.${carryForwardContext}`
     );
 
     return JSON.parse(response.replace(/```json|```/g, '').trim());
@@ -1506,7 +1714,8 @@ async function step14_top3Actions(
 async function step15_telegramBrief(
   report: DailyReport,
   top3: Array<{ rank: number; action: string; lane: string }>,
-  agentMailReplies = 0
+  agentMailReplies = 0,
+  outreachDrafts: OutreachDraft[] = []
 ): Promise<void> {
   console.log('\n[Step 15] Sending Telegram daily brief...');
 
@@ -1532,15 +1741,27 @@ async function step15_telegramBrief(
   await sendTelegram(brief);
   console.log('  Telegram brief sent.');
 
-  // Separate Katrina notification for high-risk lanes
-  if (KATRINA_TELEGRAM_CHAT_ID) {
-    const katrinaItems = top3.filter(() => false); // placeholder — check outreach items
-    const katinaBody = JSON.stringify({ chat_id: KATRINA_TELEGRAM_CHAT_ID, text: `<b>KATRINA REVIEW NEEDED — ${TODAY}</b>\n\nGabriel queued items for ${report.date} that require your compliance review before Alfred can approve.\n\nCheck Alfred's review queue.`, parse_mode: 'HTML' });
-    const kReq = https.request({ hostname: 'api.telegram.org', path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(katinaBody) } }, (res) => { res.on('data', () => {}); res.on('end', () => {}); });
+  // Separate Katrina notification — ONLY fires when compliance-lane items exist
+  const katrinaItems = outreachDrafts.filter(d => d.katrina_review_required);
+  if (KATRINA_TELEGRAM_CHAT_ID && katrinaItems.length > 0) {
+    const laneBreakdown = [...new Set(katrinaItems.map(d => d.lane))].join(', ');
+    const katrinaText = `<b>KATRINA REVIEW NEEDED — ${TODAY}</b>\n\n` +
+      `${katrinaItems.length} outreach draft${katrinaItems.length > 1 ? 's' : ''} require compliance review before Alfred can approve.\n\n` +
+      `Lanes: ${laneBreakdown}\n\n` +
+      `Check Alfred's review queue in Supabase → outreach_drafts (status: pending_review, katrina_review_required: true).`;
+    const katinaBody = JSON.stringify({ chat_id: KATRINA_TELEGRAM_CHAT_ID, text: katrinaText, parse_mode: 'HTML' });
+    const kReq = https.request({
+      hostname: 'api.telegram.org',
+      path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(katinaBody) },
+    }, (res) => { res.on('data', () => {}); res.on('end', () => {}); });
     kReq.on('error', () => {});
     kReq.write(katinaBody);
     kReq.end();
-    console.log('  Katrina notification sent.');
+    console.log(`  Katrina notification sent (${katrinaItems.length} compliance items — lanes: ${laneBreakdown}).`);
+  } else {
+    console.log('  Katrina notification: no compliance-lane items today — skipped.');
   }
 }
 
@@ -1575,8 +1796,9 @@ async function step16_saveMemory(
         score: d.priority_score,
       }));
 
-    const { error } = await supabase.from('gabriel_memory').insert({
+    const { error } = await supabase.from('gabriel_memory').upsert({
       session_date: TODAY,
+      run_id: RUN_ID,
       leads_found: report.summary.leads_found,
       leads_scored: report.summary.leads_after_dedup,
       leads_queued: report.summary.leads_queued_for_review,
@@ -1588,7 +1810,7 @@ async function step16_saveMemory(
       top_3_actions: top3,
       run_errors: errors.map(e => ({ error: e, timestamp: new Date().toISOString() })),
       run_duration_ms: report.run_duration_ms,
-    });
+    }, { onConflict: 'session_date' });
 
     if (error) {
       console.log(`  Memory save warning: ${error.message}`);
@@ -1653,13 +1875,13 @@ async function main() {
   const reviewPackage = step11_buildReviewPackage(outreach, content, seo, marketingRecs);
   fs.writeFileSync(path.join(DATA_PATH, `review-queue/${TODAY}-${RUN_TIMESTAMP}-review-package.txt`), reviewPackage);
 
-  await step12_saveOutputs(scoredLeads, outreachDrafts, contentDrafts, seoReports).catch(e => errors.push(`Step 12: ${e}`));
+  await step12_saveOutputs(scoredLeads, outreachDrafts, contentDrafts, seoReports, marketingRecs).catch(e => errors.push(`Step 12: ${e}`));
 
   // Steps 13–15 (report + deliver)
-  const top3 = await step14_top3Actions(outreach, content, seo, config).catch(e => { errors.push(`Step 14: ${e}`); return []; });
+  const top3 = await step14_top3Actions(outreach, content, seo, config, memory.carry_forward).catch(e => { errors.push(`Step 14: ${e}`); return []; });
   const report = await step13_generateReport(rawLeads, scoredLeads, outreachDrafts, contentDrafts, seoOpportunities, top3, errors);
 
-  await step15_telegramBrief(report, top3, agentMailReplies).catch(e => console.log(`  Telegram failed: ${e}`));
+  await step15_telegramBrief(report, top3, agentMailReplies, outreachDrafts).catch(e => console.log(`  Telegram failed: ${e}`));
 
   // Optional: Send review package as HTML email via Resend
   if (RESEND_API_KEY) {
