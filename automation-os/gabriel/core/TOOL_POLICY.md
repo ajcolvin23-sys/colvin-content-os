@@ -16,6 +16,7 @@ load: When deciding how to execute a task
 | Cross-check a GPT-4o conclusion | Gemini | nothing |
 | Web research, live page scraping, competitor data | Firecrawl | GPT hallucination |
 | CRM reads and writes | Supabase | in-memory only |
+| Brand templates, social graphics, and video/design exports | Canva Connect API | LLM-generated layouts as final design |
 | Daily brief and alerts | Telegram | email (too slow) |
 | Outreach emails after Alfred approval | Resend | Telegram |
 | Inbound prospect reply monitoring | AgentMail | manual checking |
@@ -35,6 +36,7 @@ Always use the highest available tier. Default to Level 0 unless a higher tier i
 | **Microsoft Clarity** | Free heatmaps, session recordings, scroll depth | Add Clarity snippet to Vercel sites (clarity.microsoft.com) |
 | **React/Tailwind spec** | Design system — Gabriel generates buildable component specs directly | No setup — Gabriel produces code-ready specs |
 | **Penpot Free** | Open-source visual design tool (Figma alternative) | penpot.app — free account |
+| **Canva Developer / Connect API** | Reusable branded templates and exports | Requires Canva MFA + integration credentials |
 
 ### Level 1 — Free with One-Time SDK Install
 
@@ -71,6 +73,7 @@ posthog:                [ ] not installed  [ ] installed
 supabase_experiments:   [x] available (table exists via migration 006)
 penpot:                 [ ] not set up
 figma:                  [ ] not set up
+canva_connect_api:      [ ] blocked pending Canva MFA  [ ] credentials configured
 ```
 
 **Default experiment platform until tools are installed:** Supabase DIY

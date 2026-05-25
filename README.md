@@ -34,3 +34,21 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Gabriel Canva Integration
+
+Gabriel has a guarded Canva Connect API foundation for template-based content production and MP4/design exports. Canva is disabled until developer credentials are configured.
+
+Status endpoint:
+
+```text
+/api/canva/status
+```
+
+Setup guide:
+
+```text
+docs/CANVA_GABRIEL_SETUP.md
+```
+
+Canva requires MFA before creating a developer integration. Keep Canva secrets server-side only.

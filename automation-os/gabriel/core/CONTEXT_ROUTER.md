@@ -28,6 +28,7 @@ Before loading any skill, answer these 7 questions internally:
 | Design a landing page, component, or layout variation | `skills/paper-design-system` |
 | Set up or evaluate an A/B test | `skills/humblytics-experiment` |
 | Create LinkedIn, Facebook, TikTok, Instagram, email, or blog content | `skills/content-engine` |
+| Turn approved content into Canva template/export instructions | `skills/canva-video-workflow` |
 | Review anything before it goes live | `skills/qa-publish-guard` |
 | Review performance data, update memory, or improve a workflow | `skills/analytics-learning-loop` |
 
