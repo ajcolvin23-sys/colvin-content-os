@@ -1206,79 +1206,53 @@ async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> 
   console.log('\n[Step 5] Generating content drafts (REVIEW REQUIRED — never auto-published)...');
   const drafts: ContentDraft[] = [];
 
-  // Rotate target lane by day of week — not always active_lanes[0]
-  const dayOfWeek = new Date().getDay(); // 0=Sun, 1=Mon, etc.
-  const targetLane = config.active_lanes[dayOfWeek % config.active_lanes.length];
-  const isKatrinaLane = config.compliance.katrina_gate_lanes.includes(targetLane);
+  // Generate content for ALL active lanes every run — no day-of-week rotation
+  for (const targetLane of config.active_lanes) {
+    const isKatrinaLane = config.compliance.katrina_gate_lanes.includes(targetLane);
+    console.log(`  Generating content for: ${targetLane}${isKatrinaLane ? ' [katrina_review_required]' : ''}`);
 
-  console.log(`  Target lane: ${targetLane} (day rotation: ${dayOfWeek} mod ${config.active_lanes.length})`);
-
-  try {
-    const systemPrompt = `You are Genius, the content agent for Alfred Colvin. Write a LinkedIn post for the ${targetLane} business.
+    try {
+      const systemPrompt = `You are Genius, the content agent for Alfred Colvin. Write a LinkedIn post for the ${targetLane} business.
 Alfred's voice: professional, warm, educational, faith-rooted. Not corporate. Speaks to business owners in Indianapolis.
 Format: Strong hook first line (NO emoji, NO "Are you..." rhetorical questions) + 3-4 body paragraphs + CTA. Under 1300 chars.
 IMPORTANT: Do NOT invent client stories, case studies, or results you cannot verify. If you reference a result, label it [hypothesis] or [example scenario].
 Return JSON: { draft: string, character_count: number }`;
 
-    const response = await callGPT(
-      config.model_routing.content_generation,
-      systemPrompt,
-      `Write a LinkedIn post for ${targetLane} for ${TODAY}. Be specific about Indianapolis context. No fabricated case studies.`
-    );
-
-    const parsed = JSON.parse(response.replace(/```json|```/g, '').trim());
-    const draft = parsed.draft ?? '';
-
-    // Run evidence scanner — block if hallucination detected
-    const hallucinationFlags = scanForHallucinations(draft);
-    if (hallucinationFlags.length > 0) {
-      console.log(`  ⚠️  Content draft BLOCKED by evidence scanner: ${hallucinationFlags.join(', ')}`);
-      console.log(`  Regenerating without unverified claims...`);
-
-      // Try once more with stricter instruction
-      const retry = await callGPT(
+      const response = await callGPT(
         config.model_routing.content_generation,
-        systemPrompt + '\nSTRICT RULE: Do not reference any specific client, company result, or case study. Every claim must be generally true or labeled [hypothesis].',
-        `Rewrite the LinkedIn post for ${targetLane}. No client stories. No fabricated results.`
-      ).catch(() => '{}');
+        systemPrompt,
+        `Write a LinkedIn post for ${targetLane} for ${TODAY}. Be specific about Indianapolis context. No fabricated case studies.`
+      );
 
-      const retryParsed = JSON.parse(retry.replace(/```json|```/g, '').trim());
-      const retryDraft = retryParsed.draft ?? '';
-      const retryFlags = scanForHallucinations(retryDraft);
+      const parsed = JSON.parse(response.replace(/```json|```/g, '').trim());
+      let draft = parsed.draft ?? '';
 
-      if (retryFlags.length > 0) {
-        console.log(`  ✗ Content draft archived — evidence scanner failed twice. Not added to review queue.`);
-        return drafts; // Return empty — do not queue bad content
+      // Run evidence scanner — retry once if hallucination detected
+      const hallucinationFlags = scanForHallucinations(draft);
+      if (hallucinationFlags.length > 0) {
+        console.log(`  ⚠️  ${targetLane}: draft blocked by evidence scanner — retrying...`);
+        const retry = await callGPT(
+          config.model_routing.content_generation,
+          systemPrompt + '\nSTRICT RULE: Do not reference any specific client, company result, or case study. Every claim must be generally true or labeled [hypothesis].',
+          `Rewrite the LinkedIn post for ${targetLane}. No client stories. No fabricated results.`
+        ).catch(() => '{}');
+        const retryParsed = JSON.parse(retry.replace(/```json|```/g, '').trim());
+        const retryDraft = retryParsed.draft ?? '';
+        if (scanForHallucinations(retryDraft).length > 0) {
+          console.log(`  ✗ ${targetLane}: evidence scanner failed twice — skipping lane`);
+          continue;
+        }
+        draft = retryDraft;
       }
 
       drafts.push({
-        lane: targetLane,
-        platform: 'linkedin',
-        content_type: 'post',
-        draft: retryDraft,
-        character_count: retryDraft.length,
-        review_required: true,
-        status: 'pending_review',
+        lane: targetLane, platform: 'linkedin', content_type: 'post',
+        draft, character_count: parsed.character_count ?? draft.length,
+        review_required: true, status: 'pending_review',
         katrina_review_required: isKatrinaLane,
       } as ContentDraft & { katrina_review_required?: boolean });
-    } else {
-      drafts.push({
-        lane: targetLane,
-        platform: 'linkedin',
-        content_type: 'post',
-        draft,
-        character_count: parsed.character_count ?? draft.length,
-        review_required: true,
-        status: 'pending_review',
-        katrina_review_required: isKatrinaLane,
-      } as ContentDraft & { katrina_review_required?: boolean });
-    }
 
-    // ── Generate Instagram + Facebook variants from the LinkedIn post ─────────
-    if (drafts.length > 0) {
-      const linkedinDraft = drafts[drafts.length - 1].draft;
-
-      // Instagram: shorter, hook-first, 5 hashtags, visual CTA
+      // ── Instagram variant ──────────────────────────────────────────────────
       try {
         const igResponse = await callGPT(
           config.model_routing.content_generation,
@@ -1286,11 +1260,10 @@ Return JSON: { draft: string, character_count: number }`;
 Rules: Under 300 chars main caption + line break + 5 relevant hashtags. Hook must work without context.
 No corporate speak. Punchy, visual language. Same lane: ${targetLane}.
 Return JSON: { draft: string }`,
-          `LinkedIn post to adapt:\n${linkedinDraft.slice(0, 600)}`,
+          `LinkedIn post to adapt:\n${draft.slice(0, 600)}`,
           { taskType: 'content_generation', lane: targetLane, maxTokens: 400 }
         );
-        const igParsed = JSON.parse(igResponse.replace(/```json|```/g, '').trim());
-        const igDraft = igParsed.draft ?? '';
+        const igDraft = JSON.parse(igResponse.replace(/```json|```/g, '').trim()).draft ?? '';
         if (igDraft && scanForHallucinations(igDraft).length === 0) {
           drafts.push({
             lane: targetLane, platform: 'instagram', content_type: 'caption',
@@ -1301,7 +1274,7 @@ Return JSON: { draft: string }`,
         }
       } catch { /* non-fatal */ }
 
-      // Facebook: community-focused, slightly longer, ends with a question
+      // ── Facebook variant ───────────────────────────────────────────────────
       try {
         const fbResponse = await callGPT(
           config.model_routing.content_generation,
@@ -1310,11 +1283,10 @@ Rules: Community-friendly tone, under 500 chars, end with a genuine question to 
 Alfred's audience on Facebook: Indianapolis locals, faith community, first-time entrepreneurs.
 Same lane: ${targetLane}.
 Return JSON: { draft: string }`,
-          `LinkedIn post to adapt:\n${linkedinDraft.slice(0, 600)}`,
+          `LinkedIn post to adapt:\n${draft.slice(0, 600)}`,
           { taskType: 'content_generation', lane: targetLane, maxTokens: 400 }
         );
-        const fbParsed = JSON.parse(fbResponse.replace(/```json|```/g, '').trim());
-        const fbDraft = fbParsed.draft ?? '';
+        const fbDraft = JSON.parse(fbResponse.replace(/```json|```/g, '').trim()).draft ?? '';
         if (fbDraft && scanForHallucinations(fbDraft).length === 0) {
           drafts.push({
             lane: targetLane, platform: 'facebook', content_type: 'post',
@@ -1325,12 +1297,10 @@ Return JSON: { draft: string }`,
         }
       } catch { /* non-fatal */ }
 
-      if (drafts.length > 1) {
-        console.log(`  Platform variants generated: LinkedIn + Instagram + Facebook`);
-      }
+      console.log(`  ${targetLane}: LinkedIn + Instagram + Facebook generated`);
+    } catch (err) {
+      console.log(`  ${targetLane}: content gen failed — ${String(err).slice(0, 80)}`);
     }
-  } catch (err) {
-    console.log(`  Content gen failed: ${String(err).slice(0, 80)}`);
   }
 
   console.log(`  Content drafts created: ${drafts.length} (awaiting Alfred's approval)`);
