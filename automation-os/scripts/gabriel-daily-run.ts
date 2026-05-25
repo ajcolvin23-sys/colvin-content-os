@@ -46,6 +46,13 @@ const AGENTMAIL_INBOX_ID = process.env.AGENTMAIL_INBOX_ID || '';
   // Inbox ID looks like: gabriel-outreach@users.agentmail.to
   // Create it at https://app.agentmail.to → Inboxes → New Inbox
 
+// ── Email sending identity ────────────────────────────────────────────────────
+// Set RESEND_FROM_EMAIL after verifying colvinenterprises.com in Resend dashboard.
+// Until then falls back to onboarding@resend.dev (functional but lower trust).
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+const RESEND_FROM_NAME  = process.env.RESEND_FROM_NAME  || 'Alfred Colvin';
+const RESEND_REPLY_TO   = process.env.RESEND_REPLY_TO   || 'itsinthebible.info@gmail.com';
+
 const TODAY = new Date().toISOString().split('T')[0];
 const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
 const RUN_START = Date.now();
@@ -927,6 +934,12 @@ Lead context: ${matchedLead ? `${matchedLead.title || 'Contact'} at ${matchedLea
 
           const parsed = JSON.parse(replyDraft.replace(/```json|```/g, '').trim());
           suggestedReply = parsed.draft || '';
+          const replySpamFlags = scanForSpamWords(suggestedReply);
+          if (replySpamFlags.length > 0) {
+            console.log(`  ⚠️  Spam risk in reply draft for ${senderEmail}: ${replySpamFlags.join(', ')}`);
+            // Append warning so Alfred sees it in Supabase before approving
+            suggestedReply += `\n\n[⚠️ SPAM RISK FLAGS: ${replySpamFlags.join(', ')} — review before sending]`;
+          }
         } catch {
           suggestedReply = '[GPT draft failed — write your reply manually]';
         }
@@ -1002,15 +1015,24 @@ Return JSON: { draft: string, compliance_flags: string[] }`;
       );
 
       const parsed = JSON.parse(response.replace(/```json|```/g, '').trim());
+      const draftText = parsed.draft ?? '';
+
+      // Scan for spam trigger words — flag but don't block (Alfred decides)
+      const spamFlags = scanForSpamWords(draftText);
+      const allFlags = [...(parsed.compliance_flags ?? []), ...spamFlags];
+
+      if (spamFlags.length > 0) {
+        console.log(`  ⚠️  Spam risk flags in draft for ${lead.company}: ${spamFlags.join(', ')}`);
+      }
 
       drafts.push({
         lead_name: lead.name,
         lead_company: lead.company,
         lane: lead.lane,
         message_type: 'linkedin_connection',
-        draft: parsed.draft ?? '',
+        draft: draftText,
         priority_score: lead.qualification_score,
-        compliance_flags: parsed.compliance_flags ?? [],
+        compliance_flags: allFlags,
         katrina_review_required: isKatrinaLane,
         status: 'pending_review',
       });
@@ -1044,6 +1066,34 @@ function scanForHallucinations(draft: string): string[] {
   for (const pattern of HALLUCINATION_PATTERNS) {
     if (pattern.test(draft)) {
       flags.push(`UNVERIFIED_CLAIM: "${pattern.source}"`);
+    }
+  }
+  return flags;
+}
+
+// ── Spam Word Scanner ─────────────────────────────────────────────────────────
+// Flags high-risk spam trigger words in outreach drafts BEFORE they go out.
+// These words get emails filtered by Gmail, Outlook, and corporate spam guards.
+const SPAM_TRIGGER_PATTERNS = [
+  /\b(FREE|free!|FREE!)\b/,
+  /\b(urgent|URGENT|act now|act immediately)\b/i,
+  /\b(click here|click now|click below)\b/i,
+  /\b(limited time|limited offer|expires soon|don't miss out)\b/i,
+  /\b(guaranteed|100% free|no cost|no obligation)\b/i,
+  /\b(make money|earn money|income opportunity|extra cash)\b/i,
+  /\b(unsubscribe|opt.?out)\b/i,   // in outreach (not newsletters)
+  /\b(dear friend|dear sir|to whom it may concern)\b/i,
+  /\b(congratulations you|you have been selected|you are a winner)\b/i,
+  /\$\$\$|€€€|£££/,
+  /!{3,}/,                          // three or more exclamation marks
+  /[A-Z]{8,}/,                      // 8+ consecutive caps (SCREAMING)
+];
+
+function scanForSpamWords(draft: string): string[] {
+  const flags: string[] = [];
+  for (const pattern of SPAM_TRIGGER_PATTERNS) {
+    if (pattern.test(draft)) {
+      flags.push(`SPAM_RISK: "${pattern.source}"`);
     }
   }
   return flags;
@@ -1905,11 +1955,36 @@ async function main() {
         </div>`;
 
       await resend.emails.send({
-        from: 'Gabriel <onboarding@resend.dev>',
+        from: `${RESEND_FROM_NAME} <${RESEND_FROM_EMAIL}>`,
+        reply_to: RESEND_REPLY_TO,
         to: ['itsinthebible.info@gmail.com'],
         subject: `Gabriel Brief — ${TODAY} — ${report.summary.leads_found} leads, ${report.summary.outreach_drafts_created} drafts`,
         html: emailHtml,
-        text: `Gabriel Daily Brief ${TODAY}\nLeads: ${report.summary.leads_found}\nOutreach drafts: ${report.summary.outreach_drafts_created}\nContent: ${report.summary.content_drafts_created}\nErrors: ${errors.length}`,
+        // Plain text fallback — required for deliverability (spam filters penalise HTML-only)
+        text: [
+          `Gabriel Daily Brief — ${TODAY}`,
+          '',
+          `Leads found:      ${report.summary.leads_found}`,
+          `Outreach drafts:  ${report.summary.outreach_drafts_created} awaiting your approval`,
+          `Content drafts:   ${report.summary.content_drafts_created} awaiting your review`,
+          `Follow-up drafts: ${followUpDrafts.length}`,
+          `SEO opportunities: ${report.summary.seo_opportunities_found}`,
+          '',
+          'TOP 3 ACTIONS TODAY:',
+          ...top3.map((a, i) => `${i + 1}. ${a.action} (${a.lane}) — ${a.why}`),
+          '',
+          errors.length > 0
+            ? `⚠️ ${errors.length} error(s) — check GitHub Actions logs`
+            : '✓ Clean run',
+          '',
+          `Run time: ${Math.round(report.run_duration_ms / 1000)}s | Run ID: ${RUN_ID}`,
+          '',
+          'Gabriel Automation OS — Colvin Enterprises',
+        ].join('\n'),
+        headers: {
+          // Tells spam filters this is a transactional internal email, not bulk marketing
+          'X-Entity-Ref-ID': RUN_ID,
+        },
       });
       console.log('  Daily brief sent via Resend email.');
     } catch (emailErr) {
