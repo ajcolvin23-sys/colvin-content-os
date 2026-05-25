@@ -66,8 +66,7 @@ CREATE TABLE IF NOT EXISTS review_tickets (
     -- pending | needs_katrina | approved | revised | rejected | archived
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   resolved_at TIMESTAMP WITH TIME ZONE,
-  timeout_at TIMESTAMP WITH TIME ZONE GENERATED ALWAYS AS
-    (created_at + INTERVAL '48 hours') STORED
+  timeout_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE INDEX IF NOT EXISTS review_tickets_status_idx ON review_tickets(status);
