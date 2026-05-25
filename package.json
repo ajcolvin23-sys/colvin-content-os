@@ -47,6 +47,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "mcp-google-calendar": "^0.0.5",
+    "mcp-obsidian": "^1.0.0",
     "pg": "^8.21.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

@@ -39,6 +39,20 @@
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       }
+    },
+    "obsidian": {
+      "command": "npx",
+      "args": ["-y", "mcp-obsidian", "/Users/katrinacolvin/Colvin-Hermes-Workspace/obsidian"],
+      "description": "Obsidian vault — Gabriel reads/writes memory, SOPs, proposals, daily notes"
+    },
+    "google-calendar": {
+      "command": "npx",
+      "args": ["-y", "mcp-google-calendar"],
+      "description": "Google Calendar — Gabriel sees Alfred's schedule when prioritizing daily actions",
+      "env": {
+        "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}",
+        "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}"
+      }
     }
   }
 }
