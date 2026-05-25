@@ -63,8 +63,9 @@ try {
 
 // Basic validation
 const required = ['video_id', 'brand', 'platform', 'format', 'scenes'];
+const videoScriptFields = videoScript as unknown as Record<string, unknown>;
 for (const field of required) {
-  if (!(videoScript as Record<string, unknown>)[field]) {
+  if (!videoScriptFields[field]) {
     console.error(`Missing required field: ${field}`);
     process.exit(1);
   }
