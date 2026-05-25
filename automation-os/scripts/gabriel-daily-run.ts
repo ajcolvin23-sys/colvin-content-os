@@ -41,6 +41,10 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const KATRINA_TELEGRAM_CHAT_ID = process.env.KATRINA_TELEGRAM_CHAT_ID || '';
+const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY || '';
+const AGENTMAIL_INBOX_ID = process.env.AGENTMAIL_INBOX_ID || '';
+  // Inbox ID looks like: gabriel-outreach@users.agentmail.to
+  // Create it at https://app.agentmail.to → Inboxes → New Inbox
 
 const TODAY = new Date().toISOString().split('T')[0];
 const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
@@ -443,6 +447,71 @@ async function callFirecrawlSearch(query: string, limit = 5): Promise<FirecrawlS
   });
 }
 
+// ── AgentMail Helpers ────────────────────────────────────────────────────────
+// Raw HTTPS calls to AgentMail REST API — no extra npm dependency needed
+
+interface AgentMailMessage {
+  messageId: string;
+  threadId?: string;
+  subject?: string;
+  from?: { address: string; name?: string };
+  extractedText?: string;  // reply content only, no quoted history
+  text?: string;           // full body fallback
+  html?: string;
+  receivedAt?: string;
+  labels?: string[];
+}
+
+async function fetchAgentMailUnread(inboxId: string): Promise<AgentMailMessage[]> {
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.agentmail.to',
+      path: `/inboxes/${encodeURIComponent(inboxId)}/messages?labels=unread&limit=20`,
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${AGENTMAIL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          // API may return { messages: [] } or { data: [] } or []
+          const messages = parsed.messages ?? parsed.data ?? (Array.isArray(parsed) ? parsed : []);
+          resolve(messages as AgentMailMessage[]);
+        } catch { resolve([]); }
+      });
+    });
+    req.on('error', () => resolve([]));
+    req.setTimeout(10000, () => { req.destroy(); resolve([]); });
+    req.end();
+  });
+}
+
+async function markAgentMailRead(inboxId: string, messageId: string): Promise<void> {
+  return new Promise((resolve) => {
+    const body = JSON.stringify({ add_labels: ['read'], remove_labels: ['unread'] });
+    const req = https.request({
+      hostname: 'api.agentmail.to',
+      path: `/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AGENTMAIL_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      res.on('data', () => {});
+      res.on('end', () => resolve());
+    });
+    req.on('error', () => resolve()); // non-fatal
+    req.write(body);
+    req.end();
+  });
+}
+
 // ── Lane search query definitions ─────────────────────────────────────────────
 const LANE_SEARCH_QUERIES: Record<string, string[]> = {
   colvin_enterprises: [
@@ -687,6 +756,133 @@ Return JSON: { draft: string, compliance_flags: string[] }`;
   }
 
   return followUpDrafts;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STEP 3c — AgentMail Reply Monitor
+// Checks the Gabriel outreach inbox for prospect replies.
+// For each unread reply:
+//   1. Matches the sender to a known lead in Supabase
+//   2. Drafts a suggested follow-up response (GPT)
+//   3. Saves to outreach_replies table (status: pending_review)
+//   4. Marks the message as read in AgentMail
+// Alfred reviews and approves the suggested reply before anything goes out.
+// ═══════════════════════════════════════════════════════════════════════════════
+async function step3c_checkOutreachReplies(config: GabrielConfig): Promise<number> {
+  console.log('\n[Step 3c] AgentMail — checking for prospect replies...');
+
+  if (!AGENTMAIL_API_KEY || !AGENTMAIL_INBOX_ID) {
+    console.log('  AgentMail not configured — skipping. Set AGENTMAIL_API_KEY + AGENTMAIL_INBOX_ID to enable.');
+    return 0;
+  }
+
+  let repliesProcessed = 0;
+
+  try {
+    const messages = await fetchAgentMailUnread(AGENTMAIL_INBOX_ID);
+
+    if (messages.length === 0) {
+      console.log('  No new replies in AgentMail inbox.');
+      return 0;
+    }
+
+    console.log(`  ${messages.length} unread message(s) found — processing...`);
+
+    for (const msg of messages) {
+      try {
+        // Skip if already processed (idempotency guard)
+        const { data: existing } = await supabase
+          .from('outreach_replies')
+          .select('id')
+          .eq('agentmail_message_id', msg.messageId)
+          .maybeSingle();
+
+        if (existing) {
+          console.log(`  Already processed ${msg.messageId} — skipping`);
+          await markAgentMailRead(AGENTMAIL_INBOX_ID, msg.messageId);
+          continue;
+        }
+
+        const senderEmail = msg.from?.address || '';
+        const senderName  = msg.from?.name || 'Unknown';
+        const replyBody   = (msg.extractedText || msg.text || '').slice(0, 800);
+
+        // Find matching lead by email
+        const { data: matchedLead } = await supabase
+          .from('leads')
+          .select('id, name, company, title, lane, fit_reason, qualification_score')
+          .eq('email', senderEmail)
+          .maybeSingle();
+
+        const lane = matchedLead?.lane || 'colvin_enterprises';
+        const isKatrinaLane = config.compliance.katrina_gate_lanes.includes(lane);
+
+        // Draft a suggested reply — Alfred always approves before sending
+        let suggestedReply = '';
+        try {
+          const replyDraft = await callGPT(
+            config.model_routing.outreach_drafts,
+            `You are Alfred Colvin's outreach assistant. Draft a warm, professional reply to this prospect's email.
+Alfred's voice: direct, faith-rooted, entrepreneurial. Based in Indianapolis.
+Max 150 words. No hollow openers ("Great to hear from you", "Thanks for reaching out").
+Lead with a specific, relevant response to what they actually said.
+This is a DRAFT — Alfred must review and approve before it goes out.
+Return JSON only: { "draft": "..." }`,
+            `Prospect: ${senderName} <${senderEmail}>
+Subject: ${msg.subject || '(no subject)'}
+Their message:
+${replyBody}
+Lane: ${lane}
+Lead context: ${matchedLead ? `${matchedLead.title || 'Contact'} at ${matchedLead.company} — ${matchedLead.fit_reason || ''}` : 'Unknown sender (not in CRM)'}`,
+            { taskType: 'outreach_drafts', lane }
+          );
+
+          const parsed = JSON.parse(replyDraft.replace(/```json|```/g, '').trim());
+          suggestedReply = parsed.draft || '';
+        } catch {
+          suggestedReply = '[GPT draft failed — write your reply manually]';
+        }
+
+        // Save to Supabase
+        const { error: insertError } = await supabase.from('outreach_replies').insert({
+          agentmail_message_id: msg.messageId,
+          agentmail_thread_id:  msg.threadId || null,
+          inbox_id:             AGENTMAIL_INBOX_ID,
+          from_email:           senderEmail,
+          from_name:            senderName || null,
+          subject:              msg.subject || null,
+          body_text:            replyBody || null,
+          lane,
+          lead_id:              matchedLead?.id || null,
+          suggested_reply:      suggestedReply,
+          status:               'pending_review',
+          received_at:          msg.receivedAt || new Date().toISOString(),
+        });
+
+        if (insertError) {
+          console.log(`  Failed to save reply from ${senderEmail}: ${insertError.message}`);
+        } else {
+          repliesProcessed++;
+          console.log(`  Reply from ${senderName} <${senderEmail}> (${lane}) — suggested response drafted${isKatrinaLane ? ' ⚠️ KATRINA REVIEW REQUIRED' : ''}`);
+        }
+
+        // Mark as read in AgentMail (always — even if Supabase save failed)
+        await markAgentMailRead(AGENTMAIL_INBOX_ID, msg.messageId);
+
+      } catch (err) {
+        console.log(`  Failed to process reply ${msg.messageId}: ${String(err).slice(0, 80)}`);
+      }
+    }
+
+    if (repliesProcessed > 0) {
+      console.log(`  ${repliesProcessed} new repl${repliesProcessed === 1 ? 'y' : 'ies'} saved to Supabase outreach_replies — awaiting your approval.`);
+    }
+
+  } catch (err) {
+    console.log(`  AgentMail reply check failed: ${String(err).slice(0, 80)}`);
+  }
+
+  return repliesProcessed;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1309,7 +1505,8 @@ async function step14_top3Actions(
 // ═══════════════════════════════════════════════════════════════════════════════
 async function step15_telegramBrief(
   report: DailyReport,
-  top3: Array<{ rank: number; action: string; lane: string }>
+  top3: Array<{ rank: number; action: string; lane: string }>,
+  agentMailReplies = 0
 ): Promise<void> {
   console.log('\n[Step 15] Sending Telegram daily brief...');
 
@@ -1318,6 +1515,7 @@ async function step15_telegramBrief(
     '',
     `LEADS: ${report.summary.leads_found} found, ${report.summary.leads_queued_for_review} queued for review`,
     `OUTREACH DRAFTS: ${report.summary.outreach_drafts_created} ready for your approval`,
+    agentMailReplies > 0 ? `📬 PROSPECT REPLIES: ${agentMailReplies} new repl${agentMailReplies === 1 ? 'y' : 'ies'} — suggested responses ready` : '',
     `CONTENT: ${report.summary.content_drafts_created} pieces ready for your review`,
     `SEO: ${report.summary.seo_opportunities_found} opportunities`,
     '',
@@ -1436,6 +1634,7 @@ async function main() {
   // Steps 3–7 (intelligence gathering — each step is non-fatal)
   const rawLeads = await step3_leadScout(config).catch(e => { errors.push(`Step 3: ${e}`); return []; });
   const followUpDrafts = await step3b_followUpQueue(config).catch(e => { errors.push(`Step 3b: ${e}`); return []; });
+  const agentMailReplies = await step3c_checkOutreachReplies(config).catch(e => { errors.push(`Step 3c: ${e}`); return 0; });
   const allOutreachDrafts = await step4_outreachPrep(rawLeads, config).catch(e => { errors.push(`Step 4: ${e}`); return []; });
   const outreachDrafts = [...allOutreachDrafts, ...followUpDrafts];
   const contentDrafts = await step5_contentGen(config).catch(e => { errors.push(`Step 5: ${e}`); return []; });
@@ -1460,7 +1659,7 @@ async function main() {
   const top3 = await step14_top3Actions(outreach, content, seo, config).catch(e => { errors.push(`Step 14: ${e}`); return []; });
   const report = await step13_generateReport(rawLeads, scoredLeads, outreachDrafts, contentDrafts, seoOpportunities, top3, errors);
 
-  await step15_telegramBrief(report, top3).catch(e => console.log(`  Telegram failed: ${e}`));
+  await step15_telegramBrief(report, top3, agentMailReplies).catch(e => console.log(`  Telegram failed: ${e}`));
 
   // Optional: Send review package as HTML email via Resend
   if (RESEND_API_KEY) {

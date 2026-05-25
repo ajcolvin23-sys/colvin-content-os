@@ -74,6 +74,15 @@
     "require_disclaimer_lanes": ["first_keys_indy", "funding_ready_indiana"]
   },
 
+  "agentmail": {
+    "enabled": true,
+    "reply_monitor": true,
+    "auto_draft_replies": true,
+    "auto_send_replies": false,
+    "require_alfred_approval": true,
+    "note": "Gabriel monitors the inbox and drafts replies. Alfred approves before anything sends."
+  },
+
   "cron": {
     "daily_run_utc": "0 13 * * *",
     "weekly_audit_utc": "0 14 * * 5",
