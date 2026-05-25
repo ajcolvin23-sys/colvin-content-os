@@ -39,11 +39,13 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || '';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const KATRINA_TELEGRAM_CHAT_ID = process.env.KATRINA_TELEGRAM_CHAT_ID || '';
 
 const TODAY = new Date().toISOString().split('T')[0];
-const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16); // YYYY-MM-DDTHH-MM
+const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
 const RUN_START = Date.now();
+const RUN_ID = `gabriel-${TODAY}-${RUN_START}`;
 const SKIPPED_LANES: Array<{ lane: string; reason: string; query?: string }> = [];
 
 // ── Clients ──────────────────────────────────────────────────────────────────
@@ -100,6 +102,16 @@ interface ContentDraft {
   status: 'pending_review';
 }
 
+interface SolomonSEOReport {
+  lane: string;
+  query_used: string;
+  serp_results: Array<{ url: string; title: string; description: string }>;
+  keyword_patterns: string[];
+  content_gaps: string[];
+  opportunities: string[];
+  evidence_urls: string[];
+}
+
 interface DailyReport {
   date: string;
   run_start: string;
@@ -140,23 +152,184 @@ async function sendTelegram(text: string): Promise<void> {
   });
 }
 
-// ── GPT Helper ───────────────────────────────────────────────────────────────
+// ── Retry Helper ─────────────────────────────────────────────────────────────
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  maxAttempts = 2,
+  delayMs = 2000
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts) {
+        console.log(`  [retry] ${label}: attempt ${attempt} failed — retrying in ${delayMs}ms`);
+        await new Promise(r => setTimeout(r, delayMs));
+        delayMs *= 2; // exponential backoff
+      }
+    }
+  }
+  throw lastError;
+}
+
+// ── AI Usage Logger ───────────────────────────────────────────────────────────
+const COST_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
+  'gpt-4o':           { input: 5.00,  output: 15.00 },
+  'gpt-4o-mini':      { input: 0.15,  output: 0.60  },
+  'claude-opus-4-5':  { input: 15.00, output: 75.00 },
+  'claude-haiku-3-5': { input: 0.80,  output: 4.00  },
+  'gemini-2.0-flash': { input: 0,     output: 0     }, // free tier
+};
+
+async function logAIUsage(params: {
+  provider: string; model: string; taskType: string; lane?: string;
+  inputTokens?: number; outputTokens?: number; durationMs?: number;
+  status?: string; errorMessage?: string;
+}): Promise<void> {
+  try {
+    const costs = COST_PER_M_TOKENS[params.model] || { input: 0, output: 0 };
+    const estimatedCost =
+      ((params.inputTokens || 0) / 1_000_000) * costs.input +
+      ((params.outputTokens || 0) / 1_000_000) * costs.output;
+
+    await supabase.from('ai_usage_logs').insert({
+      run_id: RUN_ID,
+      provider: params.provider,
+      model: params.model,
+      task_type: params.taskType,
+      lane: params.lane || null,
+      input_tokens: params.inputTokens || 0,
+      output_tokens: params.outputTokens || 0,
+      estimated_cost_usd: estimatedCost,
+      status: params.status || 'success',
+      error_message: params.errorMessage || null,
+      duration_ms: params.durationMs || 0,
+    });
+  } catch {
+    // Non-fatal — logging never crashes the run
+  }
+}
+
+// ── GPT Helper (with logging + retry) ────────────────────────────────────────
 async function callGPT(
   model: string,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  opts?: { taskType?: string; lane?: string; maxTokens?: number; temperature?: number }
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.7,
-    max_tokens: 2000,
-  });
-  return response.choices[0]?.message?.content ?? '';
+  const start = Date.now();
+  try {
+    const response = await withRetry(() => openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: opts?.temperature ?? 0.7,
+      max_tokens: opts?.maxTokens ?? 2000,
+    }), `callGPT:${opts?.taskType || model}`);
+
+    const content = response.choices[0]?.message?.content ?? '';
+    logAIUsage({
+      provider: 'openai', model,
+      taskType: opts?.taskType || 'general',
+      lane: opts?.lane,
+      inputTokens: response.usage?.prompt_tokens,
+      outputTokens: response.usage?.completion_tokens,
+      durationMs: Date.now() - start,
+      status: content ? 'success' : 'empty_response',
+    }).catch(() => {});
+    return content;
+  } catch (err) {
+    logAIUsage({
+      provider: 'openai', model,
+      taskType: opts?.taskType || 'general',
+      lane: opts?.lane,
+      durationMs: Date.now() - start,
+      status: 'error',
+      errorMessage: String(err).slice(0, 200),
+    }).catch(() => {});
+    throw err;
+  }
 }
+
+// ── Gemini Helper (free tier — fallback to GPT-4o-mini if no key) ─────────────
+async function callGemini(
+  prompt: string,
+  opts?: { taskType?: string; lane?: string }
+): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    return callGPT('gpt-4o-mini', 'You are a helpful assistant.', prompt, opts);
+  }
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.3 },
+    });
+    const req = https.request({
+      hostname: 'generativelanguage.googleapis.com',
+      path: `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          logAIUsage({
+            provider: 'gemini', model: 'gemini-2.0-flash',
+            taskType: opts?.taskType || 'general', lane: opts?.lane,
+            inputTokens: parsed.usageMetadata?.promptTokenCount || 0,
+            outputTokens: parsed.usageMetadata?.candidatesTokenCount || 0,
+            durationMs: Date.now() - start,
+            status: text ? 'success' : 'empty_response',
+          }).catch(() => {});
+          resolve(text);
+        } catch { resolve(''); }
+      });
+    });
+    req.on('error', () => resolve(''));
+    req.setTimeout(15000, () => { req.destroy(); resolve(''); });
+    req.write(body);
+    req.end();
+  });
+}
+
+// ── Solomon SEO Query Bank ────────────────────────────────────────────────────
+// Real search queries per lane — Firecrawl fetches live SERP data
+const SOLOMON_SEO_QUERIES: Record<string, string[]> = {
+  indiana_backflow: [
+    'backflow tester Indianapolis Indiana certified',
+    'backflow prevention service Indianapolis property manager',
+    'backflow certification testing Indiana county requirements',
+  ],
+  colvin_enterprises: [
+    'AI automation consultant Indianapolis Indiana small business',
+    'AI workflow automation Indianapolis consulting firm',
+    'business process automation Indianapolis entrepreneur',
+  ],
+  music_theory_secrets: [
+    'gospel piano lessons online course church musician',
+    'music theory for worship leaders Indiana church',
+    'learn gospel piano chords online course beginners',
+  ],
+  first_keys_indy: [
+    'first time homebuyer assistance Indianapolis Indiana 2024 2025',
+    'down payment assistance program Marion County Indiana IHCDA',
+    'first time buyer grant Indianapolis low income housing',
+  ],
+  funding_ready_indiana: [
+    'Indiana small business grant program 2024 2025 IEDC',
+    'business funding Indianapolis minority owned small business',
+    'Indiana SBDC grant loan program Indianapolis entrepreneur',
+  ],
+};
 
 // ── Ensure data directories exist ────────────────────────────────────────────
 function ensureDataDirs() {
@@ -675,48 +848,163 @@ Return JSON: { draft: string, character_count: number }`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 6 — SEO Intelligence (simplified — full Solomon skill files separate)
+// STEP 6 — Solomon SEO Intelligence (real SERP research via Firecrawl)
 // ═══════════════════════════════════════════════════════════════════════════════
-async function step6_seoIntelligence(config: GabrielConfig): Promise<string[]> {
-  console.log('\n[Step 6] Pulling SEO opportunities...');
-  const opportunities: string[] = [];
+async function step6_solomonSEO(config: GabrielConfig): Promise<SolomonSEOReport[]> {
+  console.log('\n[Step 6] Solomon SEO — live SERP research via Firecrawl...');
+  const reports: SolomonSEOReport[] = [];
 
-  try {
-    const response = await callGPT(
-      config.model_routing.seo_synthesis,
-      'You are Solomon, the SEO agent. Identify 3 specific keyword or on-page SEO opportunities for Alfred Colvin\'s active business lanes. Be specific — real keywords, real actions.',
-      `Active lanes: ${config.active_lanes.join(', ')}. Today is ${TODAY}. Give 3 actionable opportunities.`
-    );
-    const lines = response.split('\n').filter(l => l.trim()).slice(0, 3);
-    opportunities.push(...lines);
-  } catch (err) {
-    console.log(`  SEO step failed: ${String(err).slice(0, 80)}`);
+  // Rotate 2 lanes per day so all 5 get coverage across the week
+  const dayOfWeek = new Date().getDay();
+  const laneCount = config.active_lanes.length;
+  const targetLanes = [
+    config.active_lanes[dayOfWeek % laneCount],
+    config.active_lanes[(dayOfWeek + 1) % laneCount],
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  for (const lane of targetLanes) {
+    const queries = SOLOMON_SEO_QUERIES[lane];
+    if (!queries || queries.length === 0) {
+      console.log(`  [Solomon] ${lane}: no queries configured — skipping`);
+      continue;
+    }
+
+    const query = queries[dayOfWeek % queries.length];
+    console.log(`  [Solomon] ${lane}: "${query.slice(0, 60)}..."`);
+
+    try {
+      const serpResults = await withRetry(
+        () => callFirecrawlSearch(query, 5),
+        `Solomon:${lane}`, 2, 3000
+      );
+
+      if (serpResults.length === 0) {
+        SKIPPED_LANES.push({ lane, reason: 'Solomon: no SERP results', query });
+        console.log(`  [Solomon] ${lane}: no results — skipped`);
+        continue;
+      }
+
+      // Build real SERP context for GPT-4o analysis
+      const serpContext = serpResults.map((r, i) =>
+        `Result ${i + 1}:\nURL: ${r.url}\nTitle: ${r.title}\nDescription: ${r.description}\nExcerpt: ${(r.markdown || '').slice(0, 400)}`
+      ).join('\n\n---\n\n');
+
+      const solomonAnalysis = await callGPT(
+        'gpt-4o',
+        `You are Solomon, Alfred Colvin's SEO intelligence specialist based in Indianapolis, Indiana.
+Analyze real SERP data and give evidence-based recommendations ONLY.
+Never invent keywords or data. Only use what you see in the search results provided.
+Never guarantee rankings. Say "may improve" not "will improve".`,
+        `Lane: ${lane}
+Search query: "${query}"
+Date: ${TODAY}
+
+REAL SERP RESULTS:
+${serpContext}
+
+Return JSON only (no markdown):
+{
+  "keyword_patterns": ["up to 5 keywords you see ranking in these results"],
+  "content_gaps": ["2-3 topics missing from current results Alfred could fill"],
+  "opportunities": [
+    "Opportunity 1: [specific action for ${lane}] — evidence: [URL from results] — impact: low|medium|high",
+    "Opportunity 2: [specific action] — evidence: [URL] — impact: low|medium|high",
+    "Opportunity 3: [specific action] — evidence: [URL] — impact: low|medium|high"
+  ]
+}`,
+        { taskType: 'seo_synthesis', lane }
+      );
+
+      // Parse Solomon's structured response
+      let parsed: { keyword_patterns: string[]; content_gaps: string[]; opportunities: string[] } = {
+        keyword_patterns: [], content_gaps: [], opportunities: [],
+      };
+      try {
+        const jsonMatch = solomonAnalysis.match(/\{[\s\S]*\}/);
+        if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        // Fallback: extract opportunity lines
+        parsed.opportunities = solomonAnalysis
+          .split('\n')
+          .filter(l => l.toLowerCase().includes('opportunity') || l.match(/^\d\./))
+          .slice(0, 3);
+      }
+
+      const report: SolomonSEOReport = {
+        lane,
+        query_used: query,
+        serp_results: serpResults.map(r => ({ url: r.url, title: r.title, description: r.description })),
+        keyword_patterns: parsed.keyword_patterns.slice(0, 5),
+        content_gaps: parsed.content_gaps.slice(0, 3),
+        opportunities: parsed.opportunities.slice(0, 3),
+        evidence_urls: serpResults.map(r => r.url).slice(0, 3),
+      };
+
+      reports.push(report);
+      console.log(`  [Solomon] ${lane}: ${report.opportunities.length} opportunities | sources: ${report.evidence_urls.length}`);
+
+    } catch (err) {
+      console.log(`  [Solomon] ${lane} failed: ${String(err).slice(0, 80)}`);
+    }
   }
 
-  console.log(`  SEO opportunities found: ${opportunities.length}`);
-  return opportunities;
+  console.log(`  Solomon complete: ${reports.length} SEO reports generated`);
+  return reports;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 7 — Marketing Recommendations
+// STEP 7 — Genius Marketing Recommendations (informed by Solomon SEO data)
 // ═══════════════════════════════════════════════════════════════════════════════
-async function step7_marketingRecs(config: GabrielConfig): Promise<string[]> {
-  console.log('\n[Step 7] Generating marketing recommendations...');
+async function step7_geniusMarketing(
+  config: GabrielConfig,
+  seoReports: SolomonSEOReport[]
+): Promise<string[]> {
+  console.log('\n[Step 7] Genius Marketing — generating actionable recommendations...');
   const recs: string[] = [];
 
   try {
+    const dayOfWeek = new Date().getDay();
+    const focusLane = config.active_lanes[dayOfWeek % config.active_lanes.length];
+
+    // Feed Solomon's real findings into Genius for grounded recommendations
+    const seoContext = seoReports.length > 0
+      ? `Solomon's SEO findings today:\n${seoReports.map(r =>
+          `${r.lane}:\n  Keywords: ${r.keyword_patterns.slice(0, 3).join(', ')}\n  Gaps: ${r.content_gaps[0] || 'none'}\n  Top opportunity: ${r.opportunities[0] || 'none'}`
+        ).join('\n\n')}`
+      : 'No SEO data available — make recommendations based on lane context only.';
+
     const response = await callGPT(
-      config.model_routing.content_generation,
-      'You are Genius, the marketing agent. Give Alfred 2 high-ROI marketing recommendations for today. Be specific and actionable.',
-      `Active lanes: ${config.active_lanes.join(', ')}. Date: ${TODAY}.`
+      'gpt-4o',
+      `You are Genius, Alfred Colvin's marketing and conversion specialist in Indianapolis, Indiana.
+You give specific, doable, low-cost marketing actions. Never vague. Never guaranteed results.
+Never suggest mass outreach or auto-posting. Alfred approves everything before it goes out.
+Keep each recommendation under 2 sentences.`,
+      `Focus lane today: ${focusLane}
+All active lanes: ${config.active_lanes.join(', ')}
+Date: ${TODAY}
+
+${seoContext}
+
+Give exactly 3 marketing actions Alfred can take TODAY for the "${focusLane}" lane.
+Each should be completable in under 2 hours with zero budget.
+
+Return JSON array only: ["Action 1: ...", "Action 2: ...", "Action 3: ..."]`,
+      { taskType: 'marketing_recs', lane: focusLane, maxTokens: 600, temperature: 0.6 }
     );
-    const lines = response.split('\n').filter(l => l.trim()).slice(0, 2);
-    recs.push(...lines);
+
+    try {
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      const parsed: string[] = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+      recs.push(...parsed.slice(0, 3));
+    } catch {
+      const lines = response.split('\n').filter(l => l.trim() && l.length > 20).slice(0, 3);
+      recs.push(...lines);
+    }
   } catch (err) {
-    console.log(`  Marketing recs failed: ${String(err).slice(0, 80)}`);
+    console.log(`  Genius marketing failed: ${String(err).slice(0, 80)}`);
   }
 
-  console.log(`  Marketing recommendations: ${recs.length}`);
+  console.log(`  Genius recommendations: ${recs.length}`);
   return recs;
 }
 
@@ -819,9 +1107,9 @@ function step11_buildReviewPackage(
   }
 
   if (seoQueue.length > 0) {
-    pkg += `SEO OPPORTUNITIES (${seoQueue.length})\n`;
+    pkg += `SOLOMON SEO OPPORTUNITIES (${seoQueue.length}) — evidence-based, real SERP data\n`;
     pkg += '-'.repeat(40) + '\n';
-    seoQueue.forEach((opp, i) => pkg += `${i + 1}. ${opp.slice(0, 120)}\n`);
+    seoQueue.forEach((opp, i) => pkg += `${i + 1}. ${opp.slice(0, 150)}\n`);
     pkg += '\n';
   }
 
@@ -840,7 +1128,8 @@ function step11_buildReviewPackage(
 async function step12_saveOutputs(
   leads: Lead[],
   outreachDrafts: OutreachDraft[],
-  contentDrafts: ContentDraft[]
+  contentDrafts: ContentDraft[],
+  seoReports: SolomonSEOReport[] = []
 ): Promise<void> {
   console.log('\n[Step 12] Saving outputs to Supabase and data folders...');
 
@@ -906,6 +1195,29 @@ async function step12_saveOutputs(
     }
   } catch (err) {
     console.log(`  Supabase outreach save skipped: ${String(err).slice(0, 80)}`);
+  }
+
+  // Save SEO reports to file + Supabase content_queue
+  if (seoReports.length > 0) {
+    const seoPath = path.join(DATA_PATH, `content/${TODAY}-${RUN_TIMESTAMP}-seo-reports.json`);
+    fs.writeFileSync(seoPath, JSON.stringify(seoReports, null, 2));
+
+    try {
+      const seoItems = seoReports.map(r => ({
+        lane: r.lane,
+        content_type: 'seo_report',
+        platform: 'internal',
+        draft: JSON.stringify({ opportunities: r.opportunities, keyword_patterns: r.keyword_patterns, evidence_urls: r.evidence_urls }),
+        status: 'pending_review',
+        review_required: true,
+        created_at: new Date().toISOString(),
+      }));
+      const { error: seoError } = await supabase.from('content_queue').insert(seoItems);
+      if (seoError) console.log(`  SEO reports Supabase warning: ${seoError.message}`);
+      else console.log(`  Saved ${seoReports.length} SEO reports to Supabase`);
+    } catch (err) {
+      console.log(`  SEO reports save skipped: ${String(err).slice(0, 80)}`);
+    }
   }
 
   console.log(`  Files written: ${leadsPath}`);
@@ -1125,11 +1437,13 @@ async function main() {
   const rawLeads = await step3_leadScout(config).catch(e => { errors.push(`Step 3: ${e}`); return []; });
   const followUpDrafts = await step3b_followUpQueue(config).catch(e => { errors.push(`Step 3b: ${e}`); return []; });
   const allOutreachDrafts = await step4_outreachPrep(rawLeads, config).catch(e => { errors.push(`Step 4: ${e}`); return []; });
-  // Merge follow-ups into outreach drafts — they go to same review queue
   const outreachDrafts = [...allOutreachDrafts, ...followUpDrafts];
   const contentDrafts = await step5_contentGen(config).catch(e => { errors.push(`Step 5: ${e}`); return []; });
-  const seoOpportunities = await step6_seoIntelligence(config).catch(e => { errors.push(`Step 6: ${e}`); return []; });
-  const marketingRecs = await step7_marketingRecs(config).catch(e => { errors.push(`Step 7: ${e}`); return []; });
+  // Step 6: Solomon — real SERP research via Firecrawl
+  const seoReports = await step6_solomonSEO(config).catch(e => { errors.push(`Step 6: ${e}`); return [] as SolomonSEOReport[]; });
+  const seoOpportunities = seoReports.flatMap(r => r.opportunities); // string[] for downstream compat
+  // Step 7: Genius — marketing recs informed by Solomon's findings
+  const marketingRecs = await step7_geniusMarketing(config, seoReports).catch(e => { errors.push(`Step 7: ${e}`); return []; });
 
   // Steps 8–10 (processing)
   const uniqueLeads = await step8_dedup(rawLeads).catch(e => { errors.push(`Step 8: ${e}`); return rawLeads; });
@@ -1140,7 +1454,7 @@ async function main() {
   const reviewPackage = step11_buildReviewPackage(outreach, content, seo, marketingRecs);
   fs.writeFileSync(path.join(DATA_PATH, `review-queue/${TODAY}-${RUN_TIMESTAMP}-review-package.txt`), reviewPackage);
 
-  await step12_saveOutputs(scoredLeads, outreachDrafts, contentDrafts).catch(e => errors.push(`Step 12: ${e}`));
+  await step12_saveOutputs(scoredLeads, outreachDrafts, contentDrafts, seoReports).catch(e => errors.push(`Step 12: ${e}`));
 
   // Steps 13–15 (report + deliver)
   const top3 = await step14_top3Actions(outreach, content, seo, config).catch(e => { errors.push(`Step 14: ${e}`); return []; });
