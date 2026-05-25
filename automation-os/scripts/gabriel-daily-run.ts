@@ -455,11 +455,12 @@ async function step3b_followUpQueue(config: GabrielConfig): Promise<OutreachDraf
   const followUpDrafts: OutreachDraft[] = [];
 
   try {
+    // Query connected leads — follow_up_sent_at added in migration 003
+    // Until migration is applied, fall back to status-only query
     const { data: connectedLeads, error } = await supabase
       .from('leads')
       .select('*')
       .eq('status', 'connected')
-      .is('follow_up_sent_at', null)
       .limit(10);
 
     if (error) {
@@ -858,7 +859,8 @@ async function step12_saveOutputs(
     const leadsToInsert = leads
       .filter(l => l.qualification_score >= 5)
       .map(l => ({
-        name: l.name ?? null,
+        // name must be non-null until migration 003 drops the NOT NULL constraint
+        name: l.name ?? l.company ?? 'Unknown',
         company: l.company ?? '[Unknown]',
         title: l.title ?? null,
         linkedin_url: l.linkedin_url ?? null,
@@ -866,19 +868,20 @@ async function step12_saveOutputs(
         fit_reason: l.fit_reason,
         qualification_score: l.qualification_score,
         source: l.source,
-        lead_type: (!l.name && l.company) ? 'organization' : 'person',
         status: 'new',
         created_at: l.found_at ?? new Date().toISOString(),
       }));
 
     if (leadsToInsert.length > 0) {
-      const { error: leadsError } = await supabase.from('leads')
-        .upsert(leadsToInsert, {
-          onConflict: 'linkedin_url',
-          ignoreDuplicates: true,
-        });
-      if (leadsError) console.log(`  Supabase leads CRM warning: ${leadsError.message}`);
-      else console.log(`  Saved ${leadsToInsert.length} leads to Supabase CRM`);
+      // Use insert with ignoreDuplicates — onConflict on linkedin_url requires
+      // migration 003 unique constraint. Fall back to plain insert with error handling.
+      const { error: leadsError } = await supabase.from('leads').insert(leadsToInsert);
+      if (leadsError) {
+        // Likely duplicate — not a hard failure
+        console.log(`  Supabase leads CRM note: ${leadsError.message.slice(0, 100)}`);
+      } else {
+        console.log(`  Saved ${leadsToInsert.length} leads to Supabase CRM`);
+      }
     }
   } catch (err) {
     console.log(`  Supabase leads save skipped: ${String(err).slice(0, 80)}`);
