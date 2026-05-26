@@ -78,6 +78,7 @@ const DATA_PATH = path.join(__dirname, '../data');
 interface LaneStrategy {
   current_rung: string;
   rung_label: string;
+  platforms?: string[];  // if set, only generate these platforms. defaults to linkedin+instagram+facebook+tiktok
   cta?: string;
   cta_link?: string;
   cta_testers?: string;
@@ -87,6 +88,7 @@ interface LaneStrategy {
   focus_note: string;
   hooks: string[];
   transformation: string;
+  compliance_notes?: string;
 }
 
 interface GabrielConfig {
@@ -1238,8 +1240,13 @@ async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> 
     const transformation = strategy?.transformation ?? '';
     const cta = strategy?.cta ?? strategy?.cta_buyers ?? strategy?.cta_testers ?? 'Learn more';
     const focusNote = strategy?.focus_note ?? '';
+    const lanePlatforms = strategy?.platforms ?? ['linkedin', 'instagram', 'facebook', 'tiktok'];
+    const wantsLinkedIn = lanePlatforms.includes('linkedin');
+    const wantsInstagram = lanePlatforms.includes('instagram');
+    const wantsFacebook = lanePlatforms.includes('facebook');
+    const wantsTikTok = lanePlatforms.includes('tiktok');
 
-    console.log(`  [${targetLane}] Rung: ${rungLabel}${isKatrinaLane ? ' [katrina_review]' : ''}`);
+    console.log(`  [${targetLane}] Rung: ${rungLabel} | Platforms: ${lanePlatforms.join('+')}${isKatrinaLane ? ' [katrina_review]' : ''}`);
 
     try {
       // ── LinkedIn — Hook-Story-Offer, 900–1300 chars ──────────────────────
@@ -1288,15 +1295,17 @@ Return JSON: { draft: string, character_count: number }`;
         liDraft = retryDraft;
       }
 
-      drafts.push({
-        lane: targetLane, platform: 'linkedin', content_type: 'post',
-        draft: liDraft, character_count: liDraft.length,
-        review_required: true, status: 'pending_review',
-        katrina_review_required: isKatrinaLane,
-      } as ContentDraft & { katrina_review_required?: boolean });
+      if (wantsLinkedIn) {
+        drafts.push({
+          lane: targetLane, platform: 'linkedin', content_type: 'post',
+          draft: liDraft, character_count: liDraft.length,
+          review_required: true, status: 'pending_review',
+          katrina_review_required: isKatrinaLane,
+        } as ContentDraft & { katrina_review_required?: boolean });
+      }
 
       // ── Instagram — punchy hook + 5 hashtags, under 300 chars ──────────
-      try {
+      if (wantsInstagram) try {
         const igSystem = `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Instagram.
 Rules:
 - Open with the same hook idea — compressed to one punchy line (no emoji on this line)
@@ -1324,7 +1333,7 @@ Return JSON: { draft: string }`;
       } catch { /* non-fatal */ }
 
       // ── Facebook — community tone, ends with a question ─────────────────
-      try {
+      if (wantsFacebook) try {
         const fbSystem = `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Facebook.
 Rules:
 - Community-friendly tone — Indianapolis locals, faith community, entrepreneurs
@@ -1352,7 +1361,7 @@ Return JSON: { draft: string }`;
       } catch { /* non-fatal */ }
 
       // ── Short-form video script (TikTok / Reels / YouTube Shorts) ───────
-      try {
+      if (wantsTikTok) try {
         const videoSystem = `You are Genius, Alfred Colvin's content strategist. Write a short-form video script (TikTok / Instagram Reels / YouTube Shorts) using the Hook-Story-Offer framework.
 
 Alfred's voice: direct, warm, faith-rooted. Indianapolis. Speaks like a real person — not a marketer.
@@ -1397,7 +1406,7 @@ Return JSON: { script: string, duration_seconds: number, on_screen_text: string,
       } catch { /* non-fatal */ }
 
       // ── Slide carousel (LinkedIn / Instagram — 5 slides) ─────────────────
-      try {
+      if (wantsLinkedIn || wantsInstagram) try {
         const slideSystem = `You are Genius, Alfred Colvin's content strategist. Write a 5-slide carousel post using the Hook-Story-Offer framework.
 
 Alfred's voice: direct, warm, faith-rooted. Indianapolis. Clean, bold text — each slide is read in 3 seconds.
@@ -1445,7 +1454,12 @@ Return JSON: {
         }
       } catch { /* non-fatal */ }
 
-      console.log(`  ${targetLane}: ✓ LinkedIn + Instagram + Facebook + Video Script + Carousel (Hook: "${(hook ?? '').slice(0, 40)}...")`);
+      const generatedPlatforms = [
+        wantsLinkedIn && 'LinkedIn', wantsInstagram && 'Instagram',
+        wantsFacebook && 'Facebook', wantsTikTok && 'TikTok/Video',
+        (wantsLinkedIn || wantsInstagram) && 'Carousel',
+      ].filter(Boolean).join(' + ');
+      console.log(`  ${targetLane}: ✓ ${generatedPlatforms} (Hook: "${(hook ?? '').slice(0, 40)}...")`);
 
     } catch (err) {
       console.log(`  ${targetLane}: content gen failed — ${String(err).slice(0, 80)}`);
