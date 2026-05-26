@@ -1,17 +1,14 @@
 #!/usr/bin/env ts-node
-// ─────────────────────────────────────────────────────────────────────────────
-// scripts/render-daily.ts
-//
-// Daily First Keys Indy video render pipeline:
-//   1. Fetch today's generated slide content from Supabase / API
-//   2. Render vertical + square MP4 via Remotion CLI
-//   3. Upload both to Google Drive via Composio
-//   4. Send Telegram notification to Alfred
-//   5. Update Supabase render_status to 'rendered'
-//
-// Run: npx ts-node --project remotion/tsconfig.json scripts/render-daily.ts
-// Or via GitHub Actions: .github/workflows/daily-video.yml
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * render-daily.ts
+ *
+ * Pulls every pending video_project from Supabase (render_status = 'draft'),
+ * renders each one through the Remotion VideoEngine, saves the MP4 to out/,
+ * then sends a Telegram notification with all the files ready to post.
+ *
+ * Runs automatically via launchd at 8:30 AM CST (after Gabriel's 7 AM run).
+ * Can also be triggered manually: npm run render:daily
+ */
 
 import { execSync } from 'child_process'
 import * as fs from 'fs'
@@ -19,274 +16,197 @@ import * as path from 'path'
 import * as https from 'https'
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const ROOT = path.resolve(__dirname, '..')
-const OUT_DIR = path.join(ROOT, 'out')
-const REMOTION_ENTRY = path.join(ROOT, 'remotion', 'index.ts')
-const REMOTION_TSCONFIG = path.join(ROOT, 'remotion', 'tsconfig.json')
+const ROOT       = path.resolve(__dirname, '..')
+const OUT_DIR    = path.join(ROOT, 'out')
+const VIDEOS_DIR = path.join(ROOT, 'videos')
 
-// Required env vars
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iuzlbtfevzkerehmluqj.supabase.co'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8894079838:AAGFiT-sRdyFXuBbscTklm7TmsGi6XWjXdc'
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '6728929805'
-const COMPOSIO_API_KEY = process.env.COMPOSIO_API_KEY || 'ak_hIyzBFpeCSllvEQrqPOt'
-const GOOGLE_DRIVE_FOLDER = process.env.GOOGLE_DRIVE_FOLDER_ID || ''
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!
+const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHAT_ID!
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function log(msg: string) {
-  console.log(`[render-daily] ${new Date().toISOString()} — ${msg}`)
+const FORMAT_TO_COMPOSITION: Record<string, string> = {
+  '9:16': 'VideoEngine-Vertical',
+  '1:1':  'VideoEngine-Square',
+  '16:9': 'VideoEngine-Wide',
 }
 
+const LANE_EMOJI: Record<string, string> = {
+  colvin_enterprises:   '⚡',
+  music_theory_secrets: '🎹',
+  indiana_backflow:     '💧',
+  first_keys_indy:      '🏠',
+}
+
+// ── Load .env.local ───────────────────────────────────────────────────────────
+const envPath = path.join(ROOT, '.env.local')
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) continue
+    const idx = t.indexOf('=')
+    if (idx < 0) continue
+    const k = t.slice(0, idx).trim()
+    const v = t.slice(idx + 1).trim()
+    if (!process.env[k]) process.env[k] = v
+  }
+}
+
+// ── HTTP helpers ──────────────────────────────────────────────────────────────
 function httpGet(url: string, headers: Record<string, string> = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    const options = {
-      headers: { 'Content-Type': 'application/json', ...headers },
-    }
-    https.get(url, options, (res) => {
+    https.get(url, { headers: { 'Content-Type': 'application/json', ...headers } }, res => {
       let data = ''
-      res.on('data', (chunk) => (data += chunk))
+      res.on('data', c => data += c)
       res.on('end', () => resolve(data))
       res.on('error', reject)
     }).on('error', reject)
   })
 }
 
-function httpPost(url: string, body: unknown, headers: Record<string, string> = {}): Promise<string> {
+function httpPatch(url: string, body: unknown, headers: Record<string, string> = {}): Promise<void> {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body)
-    const urlObj = new URL(url)
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
-        ...headers,
-      },
-    }
-    const req = https.request(options, (res) => {
-      let data = ''
-      res.on('data', (chunk) => (data += chunk))
-      res.on('end', () => resolve(data))
-    })
+    const u = new URL(url)
+    const req = https.request({
+      hostname: u.hostname, path: u.pathname + u.search, method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), ...headers },
+    }, res => { res.resume(); res.on('end', resolve) })
     req.on('error', reject)
     req.write(payload)
     req.end()
   })
 }
 
-// ── Step 1: Fetch today's content from Supabase ────────────────────────────────
-async function fetchTodayContent() {
-  const dateStr = new Date().toISOString().split('T')[0]
-  log(`Fetching content for ${dateStr}...`)
-
-  const url = `${SUPABASE_URL}/rest/v1/video_projects?lane=eq.first_keys_indy&created_at=gte.${dateStr}T00:00:00Z&order=created_at.desc&limit=1`
-  const raw = await httpGet(url, {
-    apikey: SUPABASE_SERVICE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+async function sendTelegram(text: string) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return
+  const payload = JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML', disable_web_page_preview: true })
+  const u = new URL(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`)
+  await new Promise<void>((resolve, reject) => {
+    const req = https.request({
+      hostname: u.hostname, path: u.pathname, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+    }, res => { res.resume(); res.on('end', resolve) })
+    req.on('error', reject)
+    req.write(payload)
+    req.end()
   })
-
-  const rows = JSON.parse(raw)
-  if (!rows || rows.length === 0) {
-    throw new Error(`No daily content found for ${dateStr}. Run the /api/daily-video endpoint first.`)
-  }
-
-  const project = rows[0]
-  const settings = project.render_settings
-  log(`Found project ${project.id}: ${settings.topic}`)
-  return project
 }
 
-// ── Step 2: Render via Remotion CLI ───────────────────────────────────────────
-function renderVideo(
-  slides: unknown[],
-  compositionId: string,
-  outputFile: string,
-  totalFrames: number
-) {
-  if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true })
-  log(`Rendering ${compositionId} (${totalFrames} frames = ${(totalFrames/30).toFixed(1)}s) → ${path.basename(outputFile)}`)
+// ── Fetch pending video projects from Supabase ────────────────────────────────
+async function fetchPending() {
+  const url = `${SUPABASE_URL}/rest/v1/video_projects?render_status=eq.draft&order=created_at.asc&limit=20`
+  const raw = await httpGet(url, {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+  })
+  return JSON.parse(raw) as Array<{
+    id: string
+    title: string
+    lane: string
+    platform: string
+    aspect_ratio: string
+    render_settings: Record<string, unknown>
+  }>
+}
 
-  // Write slides to a temp JSON file (avoids shell escaping issues)
-  const propsFile = path.join(OUT_DIR, `props-${Date.now()}.json`)
-  fs.writeFileSync(propsFile, JSON.stringify({ slides }))
+// ── Render one video ──────────────────────────────────────────────────────────
+function renderVideo(videoScript: Record<string, unknown>, videoId: string): string {
+  if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true })
+  if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true })
+
+  const format = (videoScript.render_format as string) || (videoScript.format as string) || '9:16'
+  const compositionId = FORMAT_TO_COMPOSITION[format] ?? 'VideoEngine-Vertical'
+  const outputFile = path.join(OUT_DIR, `${videoId}.mp4`)
+  const propsFile  = path.join(OUT_DIR, `${videoId}-props.json`)
+
+  fs.writeFileSync(propsFile, JSON.stringify({ videoScript }))
+
+  console.log(`  Rendering ${videoId} (${format}) via ${compositionId}...`)
 
   try {
-    const cmd = [
-      'npx remotion render',
-      `"${REMOTION_ENTRY}"`,
-      compositionId,
-      `"${outputFile}"`,
-      `--config="${REMOTION_TSCONFIG}"`,
-      `--props="${propsFile}"`,
-      '--log=error',
-    ].join(' ')
-
-    execSync(cmd, { stdio: 'inherit', cwd: ROOT })
+    execSync(
+      `npx remotion render remotion/index.ts ${compositionId} "${outputFile}" --props="${propsFile}" --log=error`,
+      { cwd: ROOT, stdio: 'inherit' }
+    )
   } finally {
     if (fs.existsSync(propsFile)) fs.unlinkSync(propsFile)
   }
 
-  log(`Rendered: ${path.basename(outputFile)} (${(fs.statSync(outputFile).size / 1024 / 1024).toFixed(1)}MB)`)
+  const mb = fs.existsSync(outputFile)
+    ? (fs.statSync(outputFile).size / 1024 / 1024).toFixed(1)
+    : '?'
+  console.log(`  ✓ ${path.basename(outputFile)} — ${mb} MB`)
+  return outputFile
 }
 
-// ── Step 3: Upload to Google Drive via Composio ──────────────────────────────
-async function uploadToDrive(filePath: string, fileName: string): Promise<string> {
-  log(`Uploading ${fileName} to Google Drive...`)
-
-  try {
-    // Read file as base64
-    const fileBuffer = fs.readFileSync(filePath)
-    const base64Content = fileBuffer.toString('base64')
-
-    // Use Composio's Google Drive tool
-    const response = await httpPost(
-      'https://backend.composio.dev/api/v3/actions/GOOGLEDRIVE_UPLOAD_FILE/execute',
-      {
-        appName: 'googledrive',
-        input: {
-          name: fileName,
-          mimeType: 'video/mp4',
-          content: base64Content,
-          folderId: GOOGLE_DRIVE_FOLDER || null,
-        },
-      },
-      {
-        'X-API-KEY': COMPOSIO_API_KEY,
-        'x-composio-api-key': COMPOSIO_API_KEY,
-      }
-    )
-
-    const result = JSON.parse(response)
-    const fileId = result?.data?.id || result?.response?.id || result?.id || 'unknown'
-    const driveUrl = `https://drive.google.com/file/d/${fileId}/view`
-    log(`Uploaded: ${driveUrl}`)
-    return driveUrl
-  } catch (err) {
-    log(`Drive upload warning: ${err} — continuing without Drive link`)
-    return 'https://drive.google.com (upload manually)'
-  }
+// ── Update render status in Supabase ─────────────────────────────────────────
+async function markRendered(projectId: string, outputFile: string) {
+  await httpPatch(
+    `${SUPABASE_URL}/rest/v1/video_projects?id=eq.${projectId}`,
+    { render_status: 'rendered', updated_at: new Date().toISOString() },
+    { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Prefer: 'return=minimal' }
+  )
 }
 
-// ── Step 4: Send Telegram notification ────────────────────────────────────────
-async function sendTelegram(message: string) {
-  log('Sending Telegram notification...')
-  try {
-    await httpPost(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: 'HTML',
-        disable_web_page_preview: false,
-      }
-    )
-    log('Telegram sent.')
-  } catch (err) {
-    log(`Telegram warning: ${err}`)
-  }
-}
-
-// ── Step 5: Update Supabase render status ─────────────────────────────────────
-async function updateRenderStatus(projectId: string, updates: Record<string, unknown>) {
-  const url = `${SUPABASE_URL}/rest/v1/video_projects?id=eq.${projectId}`
-  await httpPost(url, updates, {
-    apikey: SUPABASE_SERVICE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-    Prefer: 'return=minimal',
-    'X-HTTP-Method-Override': 'PATCH',
-  })
-}
-
-// ── Main pipeline ─────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  log('=== First Keys Indy Daily Video Render Pipeline ===')
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  console.log(`\n╔══════════════════════════════════════════════╗`)
+  console.log(`║  Gabriel Video Render — ${today.slice(0,20).padEnd(20)} ║`)
+  console.log(`╚══════════════════════════════════════════════╝\n`)
 
-  const dateStr = new Date().toISOString().split('T')[0]
-  const dateFormatted = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric'
-  })
+  const pending = await fetchPending()
+  if (pending.length === 0) {
+    console.log('No pending videos. Gabriel may not have run yet, or all videos are already rendered.')
+    return
+  }
 
-  // 1. Fetch content
-  const project = await fetchTodayContent()
-  const { slides, totalFrames, topic, angle, caption, hashtags, tiktokSound } = project.render_settings
+  console.log(`Found ${pending.length} pending video(s):\n`)
+  pending.forEach(p => console.log(`  ${LANE_EMOJI[p.lane] ?? '🎬'} ${p.title}`))
+  console.log('')
 
-  // 2. Render videos
-  const verticalFile = path.join(OUT_DIR, `daily-vertical-${dateStr}.mp4`)
-  const squareFile = path.join(OUT_DIR, `daily-square-${dateStr}.mp4`)
+  const rendered: Array<{ title: string; lane: string; file: string }> = []
+  const failed:   Array<{ title: string; error: string }> = []
 
-  renderVideo(slides, 'DailyVideo-Vertical', verticalFile, totalFrames)
-  renderVideo(slides, 'DailyVideo-Square', squareFile, totalFrames)
+  for (const project of pending) {
+    const videoScript = project.render_settings as Record<string, unknown>
+    const videoId = (videoScript.video_id as string) || project.id
 
-  // 2b. Copy latest video to first-keys-indy website (auto-updates landing page)
-  const firstKeysPublicDir = path.join(ROOT, '..', 'first-keys-indy', 'public', 'daily')
-  if (fs.existsSync(path.join(ROOT, '..', 'first-keys-indy'))) {
     try {
-      if (!fs.existsSync(firstKeysPublicDir)) fs.mkdirSync(firstKeysPublicDir, { recursive: true })
-      fs.copyFileSync(verticalFile, path.join(firstKeysPublicDir, 'latest-vertical.mp4'))
-      fs.copyFileSync(squareFile, path.join(firstKeysPublicDir, 'latest-square.mp4'))
-      log('Copied latest videos to first-keys-indy/public/daily/')
+      const outputFile = renderVideo(videoScript, videoId)
+      await markRendered(project.id, outputFile)
+      rendered.push({ title: project.title, lane: project.lane, file: outputFile })
     } catch (err) {
-      log(`Copy warning: ${err}`)
+      console.error(`  ✗ ${project.title}: ${String(err).slice(0, 100)}`)
+      failed.push({ title: project.title, error: String(err).slice(0, 100) })
     }
   }
 
-  // 3. Upload to Google Drive
-  const [verticalUrl, squareUrl] = await Promise.all([
-    uploadToDrive(verticalFile, `[First Keys Indy] ${topic} — Vertical (${dateStr}).mp4`),
-    uploadToDrive(squareFile, `[First Keys Indy] ${topic} — Square (${dateStr}).mp4`),
-  ])
+  // ── Telegram summary ────────────────────────────────────────────────────────
+  if (rendered.length > 0) {
+    const lines = [
+      `🎬 <b>Videos Ready to Post — ${today}</b>`,
+      ``,
+      ...rendered.map(r => [
+        `${LANE_EMOJI[r.lane] ?? '🎬'} <b>${r.lane.replace(/_/g, ' ')}</b>`,
+        `📁 ${path.basename(r.file)}`,
+        `📂 Open Finder → colvin-content-os/out/ → post`,
+      ].join('\n')),
+      ``,
+      failed.length > 0 ? `⚠️ ${failed.length} failed: ${failed.map(f => f.title).join(', ')}` : '',
+      `✅ ${rendered.length} video(s) rendered and waiting in out/ folder`,
+    ].filter(l => l !== '').join('\n')
 
-  // 4. Send Telegram notification
-  const captionLines = caption ? caption.split('\n').slice(0, 3).join('\n') : ''
-  const hashtagStr = hashtags ? hashtags.map((h: string) => `#${h}`).join(' ') : ''
+    await sendTelegram(lines)
+    console.log(`\n📱 Telegram notification sent`)
+  }
 
-  const message = [
-    `🎬 <b>Daily Video Ready</b>`,
-    ``,
-    `📅 <b>${dateFormatted}</b>`,
-    `🎯 <b>Topic:</b> ${topic}`,
-    `⚡ <b>Angle:</b> ${angle}`,
-    ``,
-    `📱 <b>Caption:</b>`,
-    captionLines,
-    ``,
-    hashtagStr ? `🏷 <b>Hashtags:</b> ${hashtagStr}` : '',
-    tiktokSound ? `🎵 <b>Sound:</b> ${tiktokSound}` : '',
-    ``,
-    `📁 <b>Download Files:</b>`,
-    `▶ Vertical (TikTok/Reels): ${verticalUrl}`,
-    `▶ Square (FB/IG Feed): ${squareUrl}`,
-    ``,
-    `🌐 <b>Link:</b> FirstKeysIndy.org`,
-    `📞 <b>Phone:</b> 317-995-4719`,
-    ``,
-    `✅ Drag and drop from Google Drive to post!`,
-  ].filter(Boolean).join('\n')
-
-  await sendTelegram(message)
-
-  // 5. Update Supabase
-  await updateRenderStatus(project.id, {
-    render_status: 'rendered',
-    updated_at: new Date().toISOString(),
-    render_settings: {
-      ...project.render_settings,
-      vertical_url: verticalUrl,
-      square_url: squareUrl,
-      rendered_at: new Date().toISOString(),
-    },
-  })
-
-  log('=== Pipeline Complete ===')
-  log(`Topic: ${topic}`)
-  log(`Vertical: ${verticalUrl}`)
-  log(`Square: ${squareUrl}`)
-  log(`Files saved to: ${OUT_DIR}`)
+  console.log(`\n✓ Done — ${rendered.length} rendered, ${failed.length} failed`)
+  console.log(`📂 Files in: ${OUT_DIR}\n`)
 }
 
-main().catch((err) => {
-  console.error('[render-daily] FATAL:', err)
+main().catch(err => {
+  console.error('FATAL:', err)
   process.exit(1)
 })
