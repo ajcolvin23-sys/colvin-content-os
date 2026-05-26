@@ -15,8 +15,22 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as https from 'https'
 
+// ── Load .env.local FIRST before any env var access ──────────────────────────
+const ROOT = path.resolve(__dirname, '..')
+const envPath = path.join(ROOT, '.env.local')
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) continue
+    const idx = t.indexOf('=')
+    if (idx < 0) continue
+    const k = t.slice(0, idx).trim()
+    const v = t.slice(idx + 1).trim()
+    if (!process.env[k]) process.env[k] = v
+  }
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
-const ROOT       = path.resolve(__dirname, '..')
 const OUT_DIR    = path.join(ROOT, 'out')
 const VIDEOS_DIR = path.join(ROOT, 'videos')
 
@@ -36,20 +50,6 @@ const LANE_EMOJI: Record<string, string> = {
   music_theory_secrets: '🎹',
   indiana_backflow:     '💧',
   first_keys_indy:      '🏠',
-}
-
-// ── Load .env.local ───────────────────────────────────────────────────────────
-const envPath = path.join(ROOT, '.env.local')
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
-    const t = line.trim()
-    if (!t || t.startsWith('#')) continue
-    const idx = t.indexOf('=')
-    if (idx < 0) continue
-    const k = t.slice(0, idx).trim()
-    const v = t.slice(idx + 1).trim()
-    if (!process.env[k]) process.env[k] = v
-  }
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
