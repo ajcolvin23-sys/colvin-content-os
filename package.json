@@ -14,6 +14,7 @@
     "render:cinematic:vertical": "remotion render remotion/index.ts ColvinEnterpriseCinematicStory out/colvin-enterprise-cinematic-story.mp4",
     "render:cinematic:wide": "remotion render remotion/index.ts ColvinEnterpriseCinematicStoryWide out/colvin-enterprise-cinematic-story-wide.mp4",
     "render:daily": "npx ts-node --project remotion/tsconfig.json scripts/render-daily.ts",
+    "fetch:assets": "npx ts-node --project remotion/tsconfig.json scripts/fetch-assets.ts",
     "cron:setup": "bash scripts/setup-local-cron.sh",
     "video:generate": "curl -s -X POST $NEXT_PUBLIC_APP_URL/api/daily-video -H 'Authorization: Bearer '$CRON_SECRET -H 'Content-Type: application/json'",
     "orchestrator": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' scripts/test-orchestrator.ts",

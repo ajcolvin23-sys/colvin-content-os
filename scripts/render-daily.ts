@@ -110,6 +110,18 @@ async function fetchPending() {
   }>
 }
 
+// ── Fetch Pexels images for a video before rendering ─────────────────────────
+function fetchAssetsForVideo(jsonPath: string) {
+  try {
+    execSync(
+      `npx ts-node --project remotion/tsconfig.json scripts/fetch-assets.ts "${jsonPath}"`,
+      { cwd: ROOT, stdio: 'inherit' }
+    )
+  } catch (err) {
+    console.log(`  ⚠ Asset fetch warning: ${String(err).slice(0, 80)} — rendering without images`)
+  }
+}
+
 // ── Render one video ──────────────────────────────────────────────────────────
 function renderVideo(videoScript: Record<string, unknown>, videoId: string): string {
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true })
@@ -174,6 +186,15 @@ async function main() {
     const videoId = (videoScript.video_id as string) || project.id
 
     try {
+      // Fetch Pexels images before rendering (adds URLs to assets in JSON)
+      const jsonPath = path.join(VIDEOS_DIR, `${videoId}.json`)
+      if (fs.existsSync(jsonPath)) {
+        console.log(`  Fetching images from Pexels...`)
+        fetchAssetsForVideo(jsonPath)
+        // Reload videoScript from disk so it has the resolved image URLs
+        Object.assign(videoScript, JSON.parse(fs.readFileSync(jsonPath, 'utf8')))
+      }
+
       const outputFile = renderVideo(videoScript, videoId)
       await markRendered(project.id, outputFile)
       rendered.push({ title: project.title, lane: project.lane, file: outputFile })

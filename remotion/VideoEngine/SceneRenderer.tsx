@@ -15,6 +15,7 @@ import { SolutionScene } from './scenes/SolutionScene';
 import { ProofScene } from './scenes/ProofScene';
 import { CTAScene } from './scenes/CTAScene';
 import { SlideScene } from './scenes/SlideScene';
+import { ImageOverlayScene } from './scenes/ImageOverlayScene';
 
 interface Props {
   scene: SceneDefinition;
@@ -32,6 +33,11 @@ export const SceneRenderer: React.FC<Props> = ({
   sceneIndex,
 }) => {
   const commonProps = { scene, brand, localFrame, durationInFrames };
+
+  // If the scene has a resolved image asset, always use ImageOverlayScene
+  if (scene.assets?.[0]?.url) {
+    return <ImageOverlayScene {...commonProps} />;
+  }
 
   switch (scene.type) {
     case 'hook':

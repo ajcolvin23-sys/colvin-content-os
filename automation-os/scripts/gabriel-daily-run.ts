@@ -1364,7 +1364,8 @@ Return ONLY valid JSON matching this exact shape:
       "caption_text": "3-5 word on-screen text",
       "motion": "zoom_in",
       "transition": "cut",
-      "voiceover": "spoken hook line"
+      "voiceover": "spoken hook line",
+      "assets": [{ "type": "image", "description": "Describe a real person relevant to this lane and scene — e.g. 'Black woman looking confident and determined, portrait'", "fallback_color": null }]
     },
     {
       "id": "scene-2",
@@ -1396,7 +1397,8 @@ Return ONLY valid JSON matching this exact shape:
       "stat_label": "label for the stat or null",
       "motion": "fade",
       "transition": "fade",
-      "voiceover": "spoken proof paragraph"
+      "voiceover": "spoken proof paragraph",
+      "assets": [{ "type": "image", "description": "Describe a real person showing the positive outcome — e.g. 'Black couple smiling holding house keys outside new home'", "fallback_color": null }]
     },
     {
       "id": "scene-5",
