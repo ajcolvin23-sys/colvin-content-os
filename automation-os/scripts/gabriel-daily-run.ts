@@ -1240,9 +1240,8 @@ async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> 
     const transformation = strategy?.transformation ?? '';
     const cta = strategy?.cta ?? strategy?.cta_buyers ?? strategy?.cta_testers ?? 'Learn more';
     const focusNote = strategy?.focus_note ?? '';
-    const lanePlatforms = strategy?.platforms ?? ['linkedin', 'instagram', 'facebook', 'tiktok'];
+    const lanePlatforms = strategy?.platforms ?? ['facebook', 'tiktok'];
     const wantsLinkedIn = lanePlatforms.includes('linkedin');
-    const wantsInstagram = lanePlatforms.includes('instagram');
     const wantsFacebook = lanePlatforms.includes('facebook');
     const wantsTikTok = lanePlatforms.includes('tiktok');
 
@@ -1303,34 +1302,6 @@ Return JSON: { draft: string, character_count: number }`;
           katrina_review_required: isKatrinaLane,
         } as ContentDraft & { katrina_review_required?: boolean });
       }
-
-      // ── Instagram — punchy hook + 5 hashtags, under 300 chars ──────────
-      if (wantsInstagram) try {
-        const igSystem = `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Instagram.
-Rules:
-- Open with the same hook idea — compressed to one punchy line (no emoji on this line)
-- Under 280 chars for the caption body
-- Line break then exactly 5 relevant hashtags
-- End with the CTA: "${cta}"
-- No corporate speak. Visual, scroll-stopping language.
-Return JSON: { draft: string }`;
-
-        const igResponse = await callGPT(
-          config.model_routing.content_generation,
-          igSystem,
-          `LinkedIn post to adapt:\n${liDraft.slice(0, 800)}`,
-          { taskType: 'content_generation', lane: targetLane, maxTokens: 400 }
-        );
-        const igDraft = JSON.parse(igResponse.replace(/```json|```/g, '').trim()).draft ?? '';
-        if (igDraft && scanForHallucinations(igDraft).length === 0) {
-          drafts.push({
-            lane: targetLane, platform: 'instagram', content_type: 'caption',
-            draft: igDraft, character_count: igDraft.length,
-            review_required: true, status: 'pending_review',
-            katrina_review_required: isKatrinaLane,
-          } as ContentDraft & { katrina_review_required?: boolean });
-        }
-      } catch { /* non-fatal */ }
 
       // ── Facebook — community tone, ends with a question ─────────────────
       if (wantsFacebook) try {
@@ -1406,7 +1377,7 @@ Return JSON: { script: string, duration_seconds: number, on_screen_text: string,
       } catch { /* non-fatal */ }
 
       // ── Slide carousel (LinkedIn / Instagram — 5 slides) ─────────────────
-      if (wantsLinkedIn || wantsInstagram) try {
+      if (wantsLinkedIn) try {
         const slideSystem = `You are Genius, Alfred Colvin's content strategist. Write a 5-slide carousel post using the Hook-Story-Offer framework.
 
 Alfred's voice: direct, warm, faith-rooted. Indianapolis. Clean, bold text — each slide is read in 3 seconds.
@@ -1455,9 +1426,9 @@ Return JSON: {
       } catch { /* non-fatal */ }
 
       const generatedPlatforms = [
-        wantsLinkedIn && 'LinkedIn', wantsInstagram && 'Instagram',
+        wantsLinkedIn && 'LinkedIn',
         wantsFacebook && 'Facebook', wantsTikTok && 'TikTok/Video',
-        (wantsLinkedIn || wantsInstagram) && 'Carousel',
+        wantsLinkedIn && 'Carousel',
       ].filter(Boolean).join(' + ');
       console.log(`  ${targetLane}: ✓ ${generatedPlatforms} (Hook: "${(hook ?? '').slice(0, 40)}...")`);
 
