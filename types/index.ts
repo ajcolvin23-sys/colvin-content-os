@@ -2,7 +2,7 @@
 
 export type Platform = 'tiktok' | 'youtube' | 'facebook' | 'linkedin' | 'instagram' | 'multi'
 export type ContentLane = 'piano' | 'backflow' | 'linkedin' | 'colvin_enterprises'
-export type ContentType = 'video' | 'post' | 'article' | 'carousel' | 'short' | 'reel' | 'outreach' | 'slideshow'
+export type ContentType = 'video' | 'video_script' | 'post' | 'article' | 'carousel' | 'caption' | 'short' | 'reel' | 'outreach' | 'slideshow'
 export type ContentStatus =
   | 'draft'
   | 'needs_review'

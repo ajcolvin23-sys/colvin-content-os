@@ -1331,50 +1331,167 @@ Return JSON: { draft: string }`;
         }
       } catch { /* non-fatal */ }
 
-      // ── Short-form video script (TikTok / Reels / YouTube Shorts) ───────
+      // ── Short-form video (TikTok / Facebook Reels) — generates VideoScript JSON for Remotion ───
       if (wantsTikTok) try {
-        const videoSystem = `You are Genius, Alfred Colvin's content strategist. Write a short-form video script (TikTok / Instagram Reels / YouTube Shorts) using the Hook-Story-Offer framework.
+        const videoId = `${targetLane}-${TODAY}-${RUN_TIMESTAMP}`;
+        const videoSystem = `You are Genius, Alfred Colvin's content strategist. Generate a structured VideoScript JSON for a 45–60 second TikTok/Facebook Reel using the Hook-Story-Offer framework.
 
-Alfred's voice: direct, warm, faith-rooted. Indianapolis. Speaks like a real person — not a marketer.
-
-STRUCTURE (45–60 seconds total):
-[HOOK — 0 to 3 sec]: One line spoken to camera. Use this exact hook: "${hook ?? 'Most people have this wrong.'}"
-Must stop the scroll instantly. No "Hey guys", no emojis spoken aloud.
-
-[STORY — 3 to 45 sec]: 3–4 short punchy sentences. Build belief. Show the before/after or the reframe.
-Lane transformation: "${transformation}"
-Current rung: ${rungLabel}
+Brand voice: direct, warm, faith-rooted. Indianapolis. Real person — not a marketer.
+Lane: ${targetLane}
+Transformation: "${transformation}"
+Rung: ${rungLabel} — ${focusNote}
+Hook (use verbatim in first scene): "${hook ?? 'Most people have this wrong.'}"
+CTA: "${cta}"
 NO fabricated testimonials. NO invented numbers. Label anything hypothetical as (example).
 
-[OFFER — 45 to 60 sec]: One clear CTA. Repeat the hook idea in a new way. Then the offer.
-CTA: "${cta}"
-
-FORMAT — return as a shooting script with speaker cues:
-[HOOK] (spoken line)
-[STORY] (spoken lines — keep each sentence under 12 words)
-[CTA] (spoken line + on-screen text suggestion)
-[ON-SCREEN TEXT] (3–5 words max shown on screen during hook)
-[CAPTION HOOK] (first line for the video caption — same hook compressed to under 10 words)
-
-Return JSON: { script: string, duration_seconds: number, on_screen_text: string, caption_hook: string }`;
+Return ONLY valid JSON matching this exact shape:
+{
+  "title": "short internal title",
+  "audience": "who this is for",
+  "goal": "what this video makes them do",
+  "voiceover_script": "full spoken script 45-60 seconds",
+  "caption_hook": "first line of social caption — under 10 words, no emoji",
+  "caption": "full TikTok/Facebook caption — 150 chars max",
+  "hashtags": ["tag1","tag2","tag3"],
+  "music_direction": "music mood e.g. 'lo-fi hip hop' or 'ambient gospel piano'",
+  "thumbnail_concept": "1-sentence visual description for thumbnail",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "${hook ?? 'Most people have this wrong.'}",
+      "caption_text": "3-5 word on-screen text",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "spoken hook line"
+    },
+    {
+      "id": "scene-2",
+      "type": "problem",
+      "duration_seconds": 8,
+      "headline": "The core problem in under 8 words",
+      "body": "1-2 sentences of context",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "spoken story paragraph 1"
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "The reframe or truth",
+      "body": "The shift. What they need to know.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "spoken story paragraph 2"
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "The result or example",
+      "body": "(example) one outcome that proves the point",
+      "stat": "optional key number or null",
+      "stat_label": "label for the stat or null",
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "spoken proof paragraph"
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "One-line CTA",
+      "cta_text": "${cta}",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "spoken CTA"
+    }
+  ],
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  }
+}`;
 
         const videoResponse = await callGPT(
           config.model_routing.content_generation,
           videoSystem,
-          `Write the video script for ${targetLane} (${TODAY}). Indianapolis context. Conversational, not scripted-sounding.`,
-          { taskType: 'content_generation', lane: targetLane, maxTokens: 600 }
+          `Generate the VideoScript JSON for ${targetLane} (${TODAY}). No invented proof.`,
+          { taskType: 'content_generation', lane: targetLane, maxTokens: 1200 }
         );
         const vParsed = JSON.parse(videoResponse.replace(/```json|```/g, '').trim());
-        const vScript = vParsed.script ?? '';
-        if (vScript && scanForHallucinations(vScript).length === 0) {
+
+        if (vParsed.scenes?.length > 0 && scanForHallucinations(JSON.stringify(vParsed)).length === 0) {
+          // Build full VideoScript object
+          const videoScript = {
+            video_id: videoId,
+            created_at: new Date().toISOString(),
+            brand: targetLane,
+            platform: 'tiktok',
+            format: '9:16',
+            render_format: '9:16',
+            title: vParsed.title ?? `${targetLane} — ${TODAY}`,
+            audience: vParsed.audience ?? '',
+            goal: vParsed.goal ?? '',
+            hook: hook ?? '',
+            scenes: vParsed.scenes,
+            voiceover_script: vParsed.voiceover_script ?? '',
+            music_direction: vParsed.music_direction ?? '',
+            thumbnail_concept: vParsed.thumbnail_concept ?? '',
+            claims_check: vParsed.claims_check ?? { risk_level: 'low', issues: [], reviewed: false },
+            approval_required: true,
+            render_status: 'draft',
+            caption: vParsed.caption ?? '',
+            caption_hook: vParsed.caption_hook ?? '',
+            hashtags: vParsed.hashtags ?? [],
+          };
+
+          // Save JSON to videos/ directory so render script can find it
+          const videosDir = path.join(__dirname, '../../videos');
+          if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
+          const jsonPath = path.join(videosDir, `${videoId}.json`);
+          fs.writeFileSync(jsonPath, JSON.stringify(videoScript, null, 2));
+
+          // Save to video_projects table so dashboard can see it
+          try {
+            await supabase.from('video_projects').insert({
+              title: videoScript.title,
+              lane: targetLane,
+              platform: 'tiktok',
+              aspect_ratio: '9:16',
+              render_status: 'draft',
+              voiceover_script: videoScript.voiceover_script,
+              render_settings: videoScript,
+            });
+          } catch { /* non-fatal — JSON file is the source of truth */ }
+
+          // Also push a human-readable draft for the approvals page
+          const readableScript = [
+            `[HOOK] ${vParsed.scenes[0]?.voiceover ?? hook}`,
+            '',
+            vParsed.scenes.slice(1, -1).map((s: { voiceover?: string }) => `[STORY] ${s.voiceover ?? ''}`).join('\n'),
+            '',
+            `[CTA] ${vParsed.scenes[vParsed.scenes.length - 1]?.voiceover ?? cta}`,
+            '',
+            `[ON-SCREEN TEXT] ${vParsed.scenes[0]?.caption_text ?? ''}`,
+            `[CAPTION HOOK] ${vParsed.caption_hook ?? ''}`,
+            '',
+            `📁 VideoScript JSON saved → videos/${videoId}.json`,
+            `🎬 To render: npm run render:json -- ${videoId}.json`,
+          ].join('\n');
+
           drafts.push({
             lane: targetLane, platform: 'tiktok', content_type: 'video_script',
-            draft: vScript, character_count: vScript.length,
+            draft: readableScript, character_count: readableScript.length,
             review_required: true, status: 'pending_review',
             katrina_review_required: isKatrinaLane,
-          } as ContentDraft & { katrina_review_required?: boolean });
+            video_script_id: videoId,
+          } as ContentDraft & { katrina_review_required?: boolean; video_script_id?: string });
         }
-      } catch { /* non-fatal */ }
+      } catch (e) { console.log(`  ${targetLane} video script error: ${String(e).slice(0,80)}`); }
 
       // ── Slide carousel (LinkedIn / Instagram — 5 slides) ─────────────────
       if (wantsLinkedIn) try {

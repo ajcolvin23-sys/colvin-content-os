@@ -2,6 +2,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ContentItem } from '@/types'
 
+// ── Video render state per item ───────────────────────────────────────────────
+interface RenderState {
+  status: 'idle' | 'rendering' | 'done' | 'error'
+  download_url?: string
+  file_size_mb?: number
+  render_time_s?: number
+  error?: string
+}
+
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-800 text-gray-400',
   needs_review: 'bg-yellow-900 text-yellow-300',
@@ -15,6 +24,68 @@ const STATUS_COLORS: Record<string, string> = {
 
 const LANE_ICONS: Record<string, string> = {
   piano: '🎹', backflow: '💧', linkedin: '💼', colvin_enterprises: '⚡',
+  music_theory_secrets: '🎹', indiana_backflow: '💧', first_keys_indy: '🏠',
+}
+
+// ── Carousel renderer — parses "[Slide N — LABEL]\ntext\n💡 Design: note" ──
+function CarouselPreview({ body }: { body: string }) {
+  const slides = body.split(/\n\n(?=\[Slide)/).filter(s => s.startsWith('[Slide'))
+  const cover = body.match(/\[Cover Caption\]\n([\s\S]+)$/)?.[1]?.trim()
+  const SLIDE_COLORS = ['bg-blue-600', 'bg-purple-600', 'bg-indigo-600', 'bg-violet-600', 'bg-fuchsia-600']
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {slides.map((s, i) => {
+          const label = s.match(/\[Slide \d+ — (.+?)\]/)?.[1] ?? ''
+          const text = s.split('\n').slice(1).find(l => !l.startsWith('💡'))?.trim() ?? ''
+          const design = s.match(/💡 Design: (.+)/)?.[1] ?? ''
+          return (
+            <div key={i} className={`${SLIDE_COLORS[i % SLIDE_COLORS.length]} rounded-xl p-4 min-w-[180px] max-w-[200px] flex-shrink-0 flex flex-col justify-between min-h-[160px]`}>
+              <div className="text-xs text-white/60 font-semibold uppercase tracking-wider">{label}</div>
+              <div className="text-white font-bold text-sm leading-snug mt-2">{text}</div>
+              {design && <div className="text-white/50 text-xs mt-2 italic">{design}</div>}
+            </div>
+          )
+        })}
+      </div>
+      {cover && <div className="text-xs text-gray-400">📝 Cover caption: {cover}</div>}
+    </div>
+  )
+}
+
+// ── Video script renderer — parses [HOOK] [STORY] [CTA] [ON-SCREEN TEXT] [CAPTION HOOK] ──
+function VideoScriptPreview({ body }: { body: string }) {
+  const sections = ['HOOK', 'STORY', 'CTA', 'ON-SCREEN TEXT', 'CAPTION HOOK']
+  const SECTION_STYLES: Record<string, string> = {
+    'HOOK': 'border-l-4 border-yellow-500 bg-yellow-950/40',
+    'STORY': 'border-l-4 border-blue-500 bg-blue-950/40',
+    'CTA': 'border-l-4 border-green-500 bg-green-950/40',
+    'ON-SCREEN TEXT': 'border-l-4 border-purple-500 bg-purple-950/40',
+    'CAPTION HOOK': 'border-l-4 border-pink-500 bg-pink-950/40',
+  }
+  const parsed: { label: string; text: string }[] = []
+  for (const section of sections) {
+    const match = body.match(new RegExp(`\\[${section}\\][^\\n]*\\n?([\\s\\S]*?)(?=\\n\\[|$)`, 'i'))
+    if (match) parsed.push({ label: section, text: match[1].trim() })
+  }
+  if (parsed.length === 0) return <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-200 whitespace-pre-wrap">{body}</div>
+  return (
+    <div className="space-y-2">
+      {parsed.map(({ label, text }) => (
+        <div key={label} className={`rounded-lg p-3 ${SECTION_STYLES[label] ?? 'bg-gray-800'}`}>
+          <div className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">{label}</div>
+          <div className="text-sm text-gray-100 whitespace-pre-wrap">{text}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Smart body renderer — picks the right component by content_type ──
+function ContentBody({ contentType, body }: { contentType: string; body: string }) {
+  if (contentType === 'carousel') return <CarouselPreview body={body} />
+  if (contentType === 'video_script') return <VideoScriptPreview body={body} />
+  return <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-200 whitespace-pre-wrap">{body}</div>
 }
 
 export default function ApprovalsPage() {
@@ -24,6 +95,32 @@ export default function ApprovalsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [selected, setSelected] = useState<ContentItem | null>(null)
   const [scheduleDate, setScheduleDate] = useState('')
+  const [renderStates, setRenderStates] = useState<Record<string, RenderState>>({})
+
+  const triggerRender = async (item: ContentItem) => {
+    // Extract video_id from the draft body — looks for "videos/XXXX.json"
+    const match = item.body?.match(/videos\/([^\s]+)\.json/)
+    const video_id = match?.[1]
+    if (!video_id) { alert('No VideoScript JSON found for this item. Re-run Gabriel to regenerate.'); return }
+    setRenderStates(s => ({ ...s, [item.id]: { status: 'rendering' } }))
+    try {
+      const res = await fetch('/api/render-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id, format: '9:16' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Render failed')
+      setRenderStates(s => ({ ...s, [item.id]: {
+        status: 'done',
+        download_url: data.download_url,
+        file_size_mb: data.file_size_mb,
+        render_time_s: data.render_time_s,
+      }}))
+    } catch (e) {
+      setRenderStates(s => ({ ...s, [item.id]: { status: 'error', error: String(e) } }))
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -116,10 +213,61 @@ export default function ApprovalsPage() {
               <div className="border-t border-gray-800 px-4 py-4 space-y-3">
                 {item.body && (
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Body</div>
-                    <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-200 whitespace-pre-wrap">{item.body}</div>
+                    <div className="text-xs text-gray-500 mb-1 capitalize">{item.content_type?.replace('_', ' ') ?? 'Content'}</div>
+                    <ContentBody contentType={item.content_type ?? ''} body={item.body} />
                   </div>
                 )}
+
+                {/* ── Render button for video_script items ── */}
+                {item.content_type === 'video_script' && (() => {
+                  const rs = renderStates[item.id] ?? { status: 'idle' }
+                  return (
+                    <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🎬</span>
+                        <span className="text-sm font-semibold text-white">Remotion Render</span>
+                        <span className="text-xs text-gray-500">9:16 vertical — TikTok / Facebook Reel</span>
+                      </div>
+
+                      {rs.status === 'idle' && (
+                        <button onClick={() => triggerRender(item)}
+                          className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm rounded-lg transition-colors font-medium">
+                          🎬 Render MP4
+                        </button>
+                      )}
+
+                      {rs.status === 'rendering' && (
+                        <div className="flex items-center gap-3 text-purple-400 text-sm">
+                          <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                          Rendering... this takes 1–3 minutes
+                        </div>
+                      )}
+
+                      {rs.status === 'done' && rs.download_url && (
+                        <div className="space-y-2">
+                          <div className="text-xs text-green-400">
+                            ✓ Rendered in {rs.render_time_s}s — {rs.file_size_mb} MB
+                          </div>
+                          <a href={rs.download_url} download
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm rounded-lg transition-colors font-medium">
+                            ⬇ Download MP4
+                          </a>
+                          <div className="text-xs text-gray-500">Save to camera roll → post to TikTok / Facebook</div>
+                        </div>
+                      )}
+
+                      {rs.status === 'error' && (
+                        <div className="space-y-2">
+                          <div className="text-xs text-red-400">✗ {rs.error}</div>
+                          <button onClick={() => setRenderStates(s => ({ ...s, [item.id]: { status: 'idle' } }))}
+                            className="text-xs text-gray-400 hover:text-white underline">
+                            Try again
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
                 {item.caption && (
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Caption</div>
