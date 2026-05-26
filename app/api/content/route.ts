@@ -4,8 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { logAction } from '@/lib/audit'
 
 const CreateSchema = z.object({
-  lane: z.enum(['piano', 'backflow', 'linkedin', 'colvin_enterprises']),
-  platform: z.enum(['tiktok', 'youtube', 'facebook', 'linkedin', 'instagram', 'multi']),
+  lane: z.enum(['piano', 'backflow', 'linkedin', 'colvin_enterprises', 'music_theory_secrets', 'indiana_backflow', 'first_keys_indy', 'funding_ready_indiana']),
+  platform: z.enum(['tiktok', 'youtube', 'facebook', 'linkedin', 'multi']),
   content_type: z.string(),
   title: z.string().min(1).max(500),
   hook: z.string().optional(),

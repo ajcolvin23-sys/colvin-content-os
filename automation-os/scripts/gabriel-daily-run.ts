@@ -1822,6 +1822,32 @@ async function step12_saveOutputs(
     console.log(`  Supabase outreach save skipped: ${String(err).slice(0, 80)}`);
   }
 
+  // Save content drafts to Supabase content_items (powers the approvals page)
+  if (contentDrafts.length > 0) {
+    try {
+      const itemsToInsert = contentDrafts.map(d => {
+        const firstLine = d.draft.split('\n').find(l => l.trim().length > 0) ?? '';
+        const isKatrina = !!(d as ContentDraft & { katrina_review_required?: boolean }).katrina_review_required;
+        return {
+          lane: d.lane,
+          platform: d.platform,
+          content_type: d.content_type,
+          title: `[${d.lane}] ${d.platform} ${d.content_type} — ${TODAY}${isKatrina ? ' [katrina_review]' : ''}`,
+          hook: firstLine.slice(0, 300),
+          body: d.draft,
+          status: 'needs_review',
+          generation_model: 'gpt-4o',
+          created_at: new Date().toISOString(),
+        };
+      });
+      const { error: ciError } = await supabase.from('content_items').insert(itemsToInsert);
+      if (ciError) console.log(`  Content items Supabase warning: ${ciError.message}`);
+      else console.log(`  Saved ${itemsToInsert.length} content drafts to Supabase (visible at /approvals)`);
+    } catch (err) {
+      console.log(`  Content items save skipped: ${String(err).slice(0, 80)}`);
+    }
+  }
+
   // Save SEO reports to file + Supabase content_queue
   if (seoReports.length > 0) {
     const seoPath = path.join(DATA_PATH, `content/${TODAY}-${RUN_TIMESTAMP}-seo-reports.json`);
