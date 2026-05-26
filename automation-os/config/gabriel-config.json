@@ -1,16 +1,16 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "last_updated": "2026-05-25",
 
   "active_lanes": [
     "music_theory_secrets",
     "colvin_enterprises",
     "indiana_backflow",
-    "first_keys_indy",
-    "funding_ready_indiana"
+    "first_keys_indy"
   ],
 
   "paused_lanes": [
+    "funding_ready_indiana",
     "piano_app",
     "youtube_music",
     "girls_got_game",
@@ -62,18 +62,19 @@
       "transformation": "Testers: booked jobs without marketing spend. Managers: certified tester found in 60 seconds."
     },
     "first_keys_indy": {
-      "current_rung": "agent_outreach",
-      "rung_label": "Land one committed agent before building the funnel",
-      "cta_buyers": "Get the free first-time buyer checklist",
-      "cta_agents": "Book a 15-min call to see how the funnel works",
-      "focus_note": "CRITICAL: Present the opportunity to agents first. Do not build the consumer funnel until one agent is committed.",
+      "current_rung": "awareness",
+      "rung_label": "Minority homebuyer grant — zero down payment",
+      "cta": "See if you qualify — it takes 2 minutes",
+      "cta_link": "https://first-keys-indy.vercel.app",
+      "focus_note": "This program gives minority first-time homebuyers in Indianapolis a grant — they do NOT have to put money down. The grant does not need to be repaid. Content targets minority buyers in Marion County who think homeownership is out of reach due to down payment. Compliance: always recommend speaking with a HUD-approved lender. Never guarantee approval. Tag katrina_review_required.",
       "hooks": [
-        "You don't need 20% down to buy your first home in Indianapolis.",
-        "Marion County has programs that cover your down payment. Most first-time buyers don't know they exist.",
-        "The biggest mistake first-time homebuyers make is waiting until they think they're ready.",
-        "I run a funnel that books appointments with motivated first-time buyers. Want a full calendar?"
+        "If you're a minority first-time homebuyer in Indianapolis — you may not need a down payment at all.",
+        "There's a grant in Marion County that covers your down payment. Most people who qualify don't know it exists.",
+        "Homeownership isn't out of reach. There's a program in Indianapolis designed specifically for you.",
+        "The down payment isn't the barrier you think it is — not if you live in Marion County."
       ],
-      "transformation": "Buyers: go from confused to confident and in your first home. Agents: consistent, qualified appointments without chasing leads."
+      "transformation": "Go from thinking you can't afford a home to owning one — with a grant that covers your down payment.",
+      "compliance_notes": "Never guarantee grant approval. Never state exact dollar amounts unless verified. Always include: 'Speak with a HUD-approved lender to confirm eligibility.' Tag katrina_review_required on all content."
     },
     "funding_ready_indiana": {
       "current_rung": "bait",

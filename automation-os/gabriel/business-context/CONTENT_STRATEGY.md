@@ -135,38 +135,50 @@ Cold outreach (email/LinkedIn/local Indianapolis), referrals, short case-study c
 
 ## LANE: first_keys_indy
 
-**Two-sided play.** Buyers/sellers are the demand. The agent pays for booked appointments.
+**What this program actually is:** A grant for minority first-time homebuyers in Indianapolis (Marion County). The grant covers the down payment — buyers do NOT have to put money down and the grant does not need to be repaid.
 
-**Current build focus:** LAND ONE AGENT FIRST — do not build the consumer funnel until a paying agent is committed.
+**Transformation sold:** Go from thinking you can't afford a home to owning one — with a grant that covers your down payment.
 
-### Value Ladder (agent-client side — they pay)
+**Current build focus:** AWARENESS — reach minority first-time buyers in Marion County who don't know this program exists.
+
+### Value Ladder
 | Rung | Offer | Price | Status |
 |---|---|---|---|
-| Bait | Sample booked appointments (trial) | Free/low | FIRST MOVE — pitch agents |
-| Frontend | Monthly appointment block | $X/mo | After agent says yes |
-| Backend | Ongoing appointment-gen + ad management retainer | $X/mo recurring | The money |
-
-### Consumer funnel (build after agent is committed)
-Free lead magnet (first-time buyer roadmap / mortgage-readiness checklist) → booking calendar → agent's consult.
+| Awareness | Content reaching minority buyers who think homeownership is out of reach | Free | **NOW** |
+| Bait | "See if you qualify" — 2-min eligibility check | Free | **NOW** |
+| Frontend | Guided application support / consult | TBD | After awareness converts |
 
 ### Current Rung to Promote in Content
-**Rung: Agent outreach — present the opportunity to realtors**
+**Rung: Awareness → qualification check**
 
-### Hooks
-- *To buyers:* "You don't need 20% down to buy your first home in Indianapolis."
-- *To buyers:* "Marion County has programs that cover your down payment. Most first-time buyers don't know they exist."
-- *To agents:* "I run a funnel that books appointments with motivated first-time buyers. Want a full calendar?"
-- *To buyers:* "The biggest mistake first-time homebuyers make is waiting until they think they're 'ready.'"
+### Hooks (rotate daily)
+- "If you're a minority first-time homebuyer in Indianapolis — you may not need a down payment at all."
+- "There's a grant in Marion County that covers your down payment. Most people who qualify don't know it exists."
+- "Homeownership isn't out of reach. There's a program in Indianapolis designed specifically for you."
+- "The down payment isn't the barrier you think it is — not if you live in Marion County."
+
+### Story angle
+The program exists and most eligible buyers don't know about it. The barrier they believe is real (down payment) is removed by this grant. No fabricated stories — the program facts are the story.
 
 ### Offer CTA
-- Buyers: "Get the free first-time buyer checklist → [link]"
-- Agents: "Book a 15-min call to see how it works → [link]"
+"See if you qualify — it takes 2 minutes → https://first-keys-indy.vercel.app"
+
+### Compliance (include on every piece)
+- Never guarantee grant approval
+- Never state specific dollar amounts unless verified
+- Always include: "Speak with a HUD-approved lender to confirm eligibility"
+- Tag `katrina_review_required` on ALL first_keys_indy content
 
 ### Prediction benchmarks
-- Agent pitch → close rate (first priority)
-- Ad click → opt-in rate: 20–35%
-- Opt-in → booking rate: 10–20%
-- Booking → show rate: 60–80%
+- Content reach → site visit rate
+- Site visit → eligibility check start: 20–35%
+- Eligibility check → consult booking: 10–20%
+
+---
+
+## LANE: funding_ready_indiana — PAUSED
+
+Product not ready. Do not generate content. Resume when Alfred has a defined offer, pricing, and delivery method.
 
 ---
 
