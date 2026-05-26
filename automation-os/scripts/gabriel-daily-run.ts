@@ -1351,7 +1351,101 @@ Return JSON: { draft: string }`;
         }
       } catch { /* non-fatal */ }
 
-      console.log(`  ${targetLane}: ✓ LinkedIn + Instagram + Facebook (Hook: "${(hook ?? '').slice(0, 40)}...")`);
+      // ── Short-form video script (TikTok / Reels / YouTube Shorts) ───────
+      try {
+        const videoSystem = `You are Genius, Alfred Colvin's content strategist. Write a short-form video script (TikTok / Instagram Reels / YouTube Shorts) using the Hook-Story-Offer framework.
+
+Alfred's voice: direct, warm, faith-rooted. Indianapolis. Speaks like a real person — not a marketer.
+
+STRUCTURE (45–60 seconds total):
+[HOOK — 0 to 3 sec]: One line spoken to camera. Use this exact hook: "${hook ?? 'Most people have this wrong.'}"
+Must stop the scroll instantly. No "Hey guys", no emojis spoken aloud.
+
+[STORY — 3 to 45 sec]: 3–4 short punchy sentences. Build belief. Show the before/after or the reframe.
+Lane transformation: "${transformation}"
+Current rung: ${rungLabel}
+NO fabricated testimonials. NO invented numbers. Label anything hypothetical as (example).
+
+[OFFER — 45 to 60 sec]: One clear CTA. Repeat the hook idea in a new way. Then the offer.
+CTA: "${cta}"
+
+FORMAT — return as a shooting script with speaker cues:
+[HOOK] (spoken line)
+[STORY] (spoken lines — keep each sentence under 12 words)
+[CTA] (spoken line + on-screen text suggestion)
+[ON-SCREEN TEXT] (3–5 words max shown on screen during hook)
+[CAPTION HOOK] (first line for the video caption — same hook compressed to under 10 words)
+
+Return JSON: { script: string, duration_seconds: number, on_screen_text: string, caption_hook: string }`;
+
+        const videoResponse = await callGPT(
+          config.model_routing.content_generation,
+          videoSystem,
+          `Write the video script for ${targetLane} (${TODAY}). Indianapolis context. Conversational, not scripted-sounding.`,
+          { taskType: 'content_generation', lane: targetLane, maxTokens: 600 }
+        );
+        const vParsed = JSON.parse(videoResponse.replace(/```json|```/g, '').trim());
+        const vScript = vParsed.script ?? '';
+        if (vScript && scanForHallucinations(vScript).length === 0) {
+          drafts.push({
+            lane: targetLane, platform: 'tiktok', content_type: 'video_script',
+            draft: vScript, character_count: vScript.length,
+            review_required: true, status: 'pending_review',
+            katrina_review_required: isKatrinaLane,
+          } as ContentDraft & { katrina_review_required?: boolean });
+        }
+      } catch { /* non-fatal */ }
+
+      // ── Slide carousel (LinkedIn / Instagram — 5 slides) ─────────────────
+      try {
+        const slideSystem = `You are Genius, Alfred Colvin's content strategist. Write a 5-slide carousel post using the Hook-Story-Offer framework.
+
+Alfred's voice: direct, warm, faith-rooted. Indianapolis. Clean, bold text — each slide is read in 3 seconds.
+
+SLIDE STRUCTURE:
+Slide 1 — HOOK: "${hook ?? 'Most people have this wrong.'}" (large bold text, nothing else)
+Slide 2 — THE PROBLEM: One sentence naming the pain or cost. Under 12 words.
+Slide 3 — THE REFRAME: The contrarian truth or insight. Under 15 words.
+Slide 4 — THE PROOF/STORY: A before/after or example. Label hypothetical as (example). Under 20 words.
+Slide 5 — THE OFFER: CTA + next step. "${cta}" — under 12 words.
+
+Lane: ${targetLane} | Transformation: "${transformation}" | Rung: ${rungLabel}
+
+Return JSON: {
+  slides: [
+    { slide_number: 1, label: "HOOK", text: string, design_note: string },
+    { slide_number: 2, label: "PROBLEM", text: string, design_note: string },
+    { slide_number: 3, label: "REFRAME", text: string, design_note: string },
+    { slide_number: 4, label: "PROOF", text: string, design_note: string },
+    { slide_number: 5, label: "OFFER", text: string, design_note: string }
+  ],
+  cover_caption: string
+}`;
+
+        const slideResponse = await callGPT(
+          config.model_routing.content_generation,
+          slideSystem,
+          `Write the 5-slide carousel for ${targetLane} (${TODAY}). No invented proof.`,
+          { taskType: 'content_generation', lane: targetLane, maxTokens: 700 }
+        );
+        const sParsed = JSON.parse(slideResponse.replace(/```json|```/g, '').trim());
+        if (sParsed.slides?.length > 0) {
+          const slideDraft = sParsed.slides.map((s: { slide_number: number; label: string; text: string; design_note: string }) =>
+            `[Slide ${s.slide_number} — ${s.label}]\n${s.text}\n💡 Design: ${s.design_note}`
+          ).join('\n\n') + `\n\n[Cover Caption]\n${sParsed.cover_caption ?? ''}`;
+
+          if (scanForHallucinations(slideDraft).length === 0) {
+            drafts.push({
+              lane: targetLane, platform: 'linkedin', content_type: 'carousel',
+              draft: slideDraft, character_count: slideDraft.length,
+              review_required: true, status: 'pending_review',
+              katrina_review_required: isKatrinaLane,
+            } as ContentDraft & { katrina_review_required?: boolean });
+          }
+        }
+      } catch { /* non-fatal */ }
+
+      console.log(`  ${targetLane}: ✓ LinkedIn + Instagram + Facebook + Video Script + Carousel (Hook: "${(hook ?? '').slice(0, 40)}...")`);
 
     } catch (err) {
       console.log(`  ${targetLane}: content gen failed — ${String(err).slice(0, 80)}`);
