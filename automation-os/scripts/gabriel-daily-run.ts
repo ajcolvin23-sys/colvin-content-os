@@ -75,8 +75,23 @@ const CONFIG_PATH = path.join(__dirname, '../config/gabriel-config.json');
 const DATA_PATH = path.join(__dirname, '../data');
 
 // ── Types ────────────────────────────────────────────────────────────────────
+interface LaneStrategy {
+  current_rung: string;
+  rung_label: string;
+  cta?: string;
+  cta_link?: string;
+  cta_testers?: string;
+  cta_consumers?: string;
+  cta_buyers?: string;
+  cta_agents?: string;
+  focus_note: string;
+  hooks: string[];
+  transformation: string;
+}
+
 interface GabrielConfig {
   active_lanes: string[];
+  lane_strategy: Record<string, LaneStrategy>;
   lead_scout: { max_leads_per_lane_per_run: number; min_qualification_score: number };
   outreach: { max_drafts_per_run: number };
   content: { max_pieces_per_run: number };
@@ -1202,65 +1217,99 @@ function scanForSpamWords(draft: string): string[] {
 // ═══════════════════════════════════════════════════════════════════════════════
 // STEP 5 — Content Generation (DRAFTS ONLY)
 // ═══════════════════════════════════════════════════════════════════════════════
+// ── Hook-Story-Offer content engine ─────────────────────────────────────────
+// Framework: Brunson (funnel/ladder/traffic) + Golden (offer/pricing/value)
+// Every post follows Hook → Story → Offer for the CURRENT RUNG of the lane's value ladder.
 async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> {
-  console.log('\n[Step 5] Generating content drafts (REVIEW REQUIRED — never auto-published)...');
+  console.log('\n[Step 5] Generating content drafts — Hook-Story-Offer framework (REVIEW REQUIRED)...');
   const drafts: ContentDraft[] = [];
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
 
-  // Generate content for ALL active lanes every run — no day-of-week rotation
   for (const targetLane of config.active_lanes) {
     const isKatrinaLane = config.compliance.katrina_gate_lanes.includes(targetLane);
-    console.log(`  Generating content for: ${targetLane}${isKatrinaLane ? ' [katrina_review_required]' : ''}`);
+    const strategy = config.lane_strategy?.[targetLane];
+
+    // Rotate hooks daily so content stays fresh across platforms
+    const hook = strategy?.hooks?.length
+      ? strategy.hooks[dayOfYear % strategy.hooks.length]
+      : null;
+
+    const rungLabel = strategy?.rung_label ?? 'current offer';
+    const transformation = strategy?.transformation ?? '';
+    const cta = strategy?.cta ?? strategy?.cta_buyers ?? strategy?.cta_testers ?? 'Learn more';
+    const focusNote = strategy?.focus_note ?? '';
+
+    console.log(`  [${targetLane}] Rung: ${rungLabel}${isKatrinaLane ? ' [katrina_review]' : ''}`);
 
     try {
-      const systemPrompt = `You are Genius, the content agent for Alfred Colvin. Write a LinkedIn post for the ${targetLane} business.
-Alfred's voice: professional, warm, educational, faith-rooted. Not corporate. Speaks to business owners in Indianapolis.
-Format: Strong hook first line (NO emoji, NO "Are you..." rhetorical questions) + 3-4 body paragraphs + CTA. Under 1300 chars.
-IMPORTANT: Do NOT invent client stories, case studies, or results you cannot verify. If you reference a result, label it [hypothesis] or [example scenario].
+      // ── LinkedIn — Hook-Story-Offer, 900–1300 chars ──────────────────────
+      const linkedinSystem = `You are Genius, Alfred Colvin's content strategist. Write a LinkedIn post using the Hook-Story-Offer framework.
+
+Alfred's voice: professional, warm, direct, faith-rooted. Indianapolis-based. Never corporate or generic.
+
+FRAMEWORK — follow in this exact order:
+1. HOOK (1 line): Use this exact hook verbatim: "${hook ?? 'Most people have this wrong.'}"
+   Rules: No emoji on this line. No rhetorical "Are you..." questions. This line must stop the scroll.
+2. STORY (2–3 short paragraphs): Build belief and transfer conviction. Show a before/after or reframe.
+   Lane transformation being sold: "${transformation}"
+   Current focus: ${rungLabel} — ${focusNote}
+   CRITICAL: Do NOT invent specific clients, revenue numbers, or case study results.
+   If referencing an outcome, label it [example scenario] or [hypothesis].
+3. OFFER (1–2 lines): One clear next step matched to the current rung — no more.
+   CTA: "${cta}"
+
+Format: Hook line + blank line + story paragraphs + blank line + CTA.
+Length: 900–1300 characters total.
 Return JSON: { draft: string, character_count: number }`;
 
-      const response = await callGPT(
+      const linkedinResponse = await callGPT(
         config.model_routing.content_generation,
-        systemPrompt,
-        `Write a LinkedIn post for ${targetLane} for ${TODAY}. Be specific about Indianapolis context. No fabricated case studies.`
+        linkedinSystem,
+        `Write the Hook-Story-Offer LinkedIn post for ${targetLane} (${TODAY}). Indianapolis context. No fabricated proof.`
       );
 
-      const parsed = JSON.parse(response.replace(/```json|```/g, '').trim());
-      let draft = parsed.draft ?? '';
+      const liParsed = JSON.parse(linkedinResponse.replace(/```json|```/g, '').trim());
+      let liDraft = liParsed.draft ?? '';
 
-      // Run evidence scanner — retry once if hallucination detected
-      const hallucinationFlags = scanForHallucinations(draft);
-      if (hallucinationFlags.length > 0) {
-        console.log(`  ⚠️  ${targetLane}: draft blocked by evidence scanner — retrying...`);
+      // Evidence scanner — retry once with stricter prompt if flagged
+      const liFlags = scanForHallucinations(liDraft);
+      if (liFlags.length > 0) {
+        console.log(`  ⚠️  ${targetLane} LinkedIn: evidence scanner flagged — retrying...`);
         const retry = await callGPT(
           config.model_routing.content_generation,
-          systemPrompt + '\nSTRICT RULE: Do not reference any specific client, company result, or case study. Every claim must be generally true or labeled [hypothesis].',
-          `Rewrite the LinkedIn post for ${targetLane}. No client stories. No fabricated results.`
+          linkedinSystem + '\nFINAL RULE: Zero specific clients, zero fabricated results, zero unverifiable numbers. Label any outcome as [example scenario].',
+          `Rewrite for ${targetLane}. No invented proof. Keep the hook verbatim.`
         ).catch(() => '{}');
-        const retryParsed = JSON.parse(retry.replace(/```json|```/g, '').trim());
-        const retryDraft = retryParsed.draft ?? '';
+        const retryDraft = JSON.parse(retry.replace(/```json|```/g, '').trim()).draft ?? '';
         if (scanForHallucinations(retryDraft).length > 0) {
           console.log(`  ✗ ${targetLane}: evidence scanner failed twice — skipping lane`);
           continue;
         }
-        draft = retryDraft;
+        liDraft = retryDraft;
       }
 
       drafts.push({
         lane: targetLane, platform: 'linkedin', content_type: 'post',
-        draft, character_count: parsed.character_count ?? draft.length,
+        draft: liDraft, character_count: liDraft.length,
         review_required: true, status: 'pending_review',
         katrina_review_required: isKatrinaLane,
       } as ContentDraft & { katrina_review_required?: boolean });
 
-      // ── Instagram variant ──────────────────────────────────────────────────
+      // ── Instagram — punchy hook + 5 hashtags, under 300 chars ──────────
       try {
+        const igSystem = `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Instagram.
+Rules:
+- Open with the same hook idea — compressed to one punchy line (no emoji on this line)
+- Under 280 chars for the caption body
+- Line break then exactly 5 relevant hashtags
+- End with the CTA: "${cta}"
+- No corporate speak. Visual, scroll-stopping language.
+Return JSON: { draft: string }`;
+
         const igResponse = await callGPT(
           config.model_routing.content_generation,
-          `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Instagram.
-Rules: Under 300 chars main caption + line break + 5 relevant hashtags. Hook must work without context.
-No corporate speak. Punchy, visual language. Same lane: ${targetLane}.
-Return JSON: { draft: string }`,
-          `LinkedIn post to adapt:\n${draft.slice(0, 600)}`,
+          igSystem,
+          `LinkedIn post to adapt:\n${liDraft.slice(0, 800)}`,
           { taskType: 'content_generation', lane: targetLane, maxTokens: 400 }
         );
         const igDraft = JSON.parse(igResponse.replace(/```json|```/g, '').trim()).draft ?? '';
@@ -1274,16 +1323,21 @@ Return JSON: { draft: string }`,
         }
       } catch { /* non-fatal */ }
 
-      // ── Facebook variant ───────────────────────────────────────────────────
+      // ── Facebook — community tone, ends with a question ─────────────────
       try {
+        const fbSystem = `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Facebook.
+Rules:
+- Community-friendly tone — Indianapolis locals, faith community, entrepreneurs
+- Open with the hook compressed for Facebook (conversational, not corporate)
+- Under 450 chars
+- End with a genuine question that invites comments (not "what do you think?")
+- Include the CTA: "${cta}"
+Return JSON: { draft: string }`;
+
         const fbResponse = await callGPT(
           config.model_routing.content_generation,
-          `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Facebook.
-Rules: Community-friendly tone, under 500 chars, end with a genuine question to spark comments.
-Alfred's audience on Facebook: Indianapolis locals, faith community, first-time entrepreneurs.
-Same lane: ${targetLane}.
-Return JSON: { draft: string }`,
-          `LinkedIn post to adapt:\n${draft.slice(0, 600)}`,
+          fbSystem,
+          `LinkedIn post to adapt:\n${liDraft.slice(0, 800)}`,
           { taskType: 'content_generation', lane: targetLane, maxTokens: 400 }
         );
         const fbDraft = JSON.parse(fbResponse.replace(/```json|```/g, '').trim()).draft ?? '';
@@ -1297,7 +1351,8 @@ Return JSON: { draft: string }`,
         }
       } catch { /* non-fatal */ }
 
-      console.log(`  ${targetLane}: LinkedIn + Instagram + Facebook generated`);
+      console.log(`  ${targetLane}: ✓ LinkedIn + Instagram + Facebook (Hook: "${(hook ?? '').slice(0, 40)}...")`);
+
     } catch (err) {
       console.log(`  ${targetLane}: content gen failed — ${String(err).slice(0, 80)}`);
     }

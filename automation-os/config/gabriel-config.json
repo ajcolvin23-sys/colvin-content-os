@@ -1,11 +1,11 @@
 {
-  "version": "1.0.0",
-  "last_updated": "2026-05-24",
+  "version": "1.1.0",
+  "last_updated": "2026-05-25",
 
   "active_lanes": [
+    "music_theory_secrets",
     "colvin_enterprises",
     "indiana_backflow",
-    "music_theory_secrets",
     "first_keys_indy",
     "funding_ready_indiana"
   ],
@@ -17,13 +17,85 @@
     "glory_engine"
   ],
 
+  "lane_strategy": {
+    "music_theory_secrets": {
+      "current_rung": "bait",
+      "rung_label": "Free cheat sheet lead magnet",
+      "cta": "Get the free 4-chord cheat sheet",
+      "focus_note": "Build lead magnet + squeeze page first. Do NOT promote the course or membership yet.",
+      "hooks": [
+        "You were told you need years of lessons and sheet music to play piano. You don't.",
+        "4 chords. That's what separates someone who plays piano from someone who wishes they could.",
+        "Most piano students quit because they're learning the wrong things in the wrong order.",
+        "Gospel piano isn't complicated. It's just been taught wrong.",
+        "Church musicians learn more in 6 months than classical students do in 3 years. Here's why."
+      ],
+      "transformation": "Play the songs you love by ear — no sheet music, no years of lessons"
+    },
+    "colvin_enterprises": {
+      "current_rung": "bait",
+      "rung_label": "Free workflow audit",
+      "cta": "Book a free 30-min workflow audit",
+      "cta_link": "https://calendar.app.google/igj4Vfwvc1ZUB3Gc9",
+      "focus_note": "Drive audit bookings via cold outreach and content. Pilot and retainer come after the audit converts.",
+      "hooks": [
+        "You're paying people to be robots.",
+        "How much is manual invoicing or scheduling costing you every month?",
+        "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+        "Every hour your team spends on data entry is an hour they're not selling, serving, or growing.",
+        "AI doesn't replace your people. It fires the robot that lives inside their job description."
+      ],
+      "transformation": "Reclaim the hours and payroll burned on robot work — without hiring anyone new"
+    },
+    "indiana_backflow": {
+      "current_rung": "bait",
+      "rung_label": "Free tester listing + consumer visibility",
+      "cta_testers": "Get your free listing",
+      "cta_consumers": "Find a certified tester near you",
+      "focus_note": "Fill listings via tester outreach first. SEO/AEO pages compound in background. Monetize testers before building consumer funnel.",
+      "hooks": [
+        "You're invisible for the searches that book backflow jobs.",
+        "People in Indianapolis search for backflow testing every month. Are you showing up?",
+        "Missing your annual backflow test isn't just a violation — it can shut off your water.",
+        "Backflow test due? Avoid the fine. Find a certified tester near you in 60 seconds."
+      ],
+      "transformation": "Testers: booked jobs without marketing spend. Managers: certified tester found in 60 seconds."
+    },
+    "first_keys_indy": {
+      "current_rung": "agent_outreach",
+      "rung_label": "Land one committed agent before building the funnel",
+      "cta_buyers": "Get the free first-time buyer checklist",
+      "cta_agents": "Book a 15-min call to see how the funnel works",
+      "focus_note": "CRITICAL: Present the opportunity to agents first. Do not build the consumer funnel until one agent is committed.",
+      "hooks": [
+        "You don't need 20% down to buy your first home in Indianapolis.",
+        "Marion County has programs that cover your down payment. Most first-time buyers don't know they exist.",
+        "The biggest mistake first-time homebuyers make is waiting until they think they're ready.",
+        "I run a funnel that books appointments with motivated first-time buyers. Want a full calendar?"
+      ],
+      "transformation": "Buyers: go from confused to confident and in your first home. Agents: consistent, qualified appointments without chasing leads."
+    },
+    "funding_ready_indiana": {
+      "current_rung": "bait",
+      "rung_label": "Free funding discovery call",
+      "cta": "Book your free funding discovery call",
+      "focus_note": "Indiana small businesses and nonprofits seeking grants and SBA funding.",
+      "hooks": [
+        "Indiana has millions in small business funding that most owners never apply for.",
+        "The grant application most Indiana businesses skip is the one they'd actually win.",
+        "You don't need a grant writer. You need to know which grants you already qualify for."
+      ],
+      "transformation": "Walk away knowing exactly which funding sources to apply for — and how to qualify"
+    }
+  },
+
   "lead_scout": {
     "max_leads_per_lane_per_run": 10,
     "min_qualification_score": 6,
     "dedup_window_days": 30,
-    "sources_enabled": ["firecrawl_web", "linkedin_search", "directories"],
+    "sources_enabled": ["firecrawl_web", "brave_search", "directories"],
     "firecrawl_enabled": true,
-    "fallback_on_empty": false,
+    "fallback_on_empty": true,
     "never_generate_fictional_leads": true
   },
 
@@ -39,9 +111,11 @@
   "content": {
     "auto_publish": false,
     "require_alfred_approval": true,
-    "max_pieces_per_run": 5,
+    "max_pieces_per_run": 15,
     "platforms_enabled": ["linkedin", "instagram", "facebook"],
-    "video_scripts_per_run": 1
+    "video_scripts_per_run": 1,
+    "framework": "hook_story_offer",
+    "hook_rotation": "daily"
   },
 
   "review_thresholds": {

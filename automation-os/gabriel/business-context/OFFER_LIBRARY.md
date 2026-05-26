@@ -1,80 +1,140 @@
 ---
 file: OFFER_LIBRARY.md
-role: Current offers and value propositions per lane — load when writing copy or outreach
+role: Value ladders and offers per lane — load when writing copy, content, or outreach
 load: On demand — load only for the lane being worked
+framework: Brunson value ladder + Golden four levels of value
 ---
 
 # Offer Library
 
-## colvin_enterprises
+---
 
-**Core Offer:** AI Automation Workflow Buildout
-- What it is: Custom AI automation stack built for your specific business operations
-- Outcome: Save 10–20 hours/week on admin, reporting, and manual workflows
-- Proof: Alfred's own businesses run on the same automation
-- CTA: "Book a free 30-minute automation audit"
-- Booking link: https://calendar.app.google/igj4Vfwvc1ZUB3Gc9
-- Price range: Project-based, $2K–$15K
+## music_theory_secrets — Info-Product Ladder
 
-**Secondary Offer:** Done-With-You AI Strategy Session
-- What it is: 90-minute deep dive on which AI tools will give you the fastest ROI
-- Outcome: Walk away with a prioritized implementation roadmap
-- CTA: "Book your AI strategy session"
+**Transformation (sell this, not the product):** Play the songs you love by ear — no sheet music, no years of lessons.
 
-## indiana_backflow
+**Current build priority:** Front of ladder ONLY. Lead magnet → book. Do not promote course or membership yet.
 
-**Core Offer:** Free listing in Indiana's searchable backflow testing directory
-- What it is: Certified backflow testers get listed for free; property managers find them fast
-- Outcome for testers: More jobs without marketing spend
-- Outcome for managers: One place to find a licensed tester near any Indiana property
-- CTA (testers): "Get listed free"
-- CTA (managers): "Find a certified tester near you"
+| Rung | Offer | Price | Status |
+|---|---|---|---|
+| Bait | "Play Any Gospel Song With 4 Chords" cheat sheet / 10-min video | Free | **BUILD NOW** |
+| Frontend | Music Theory Secrets book | $9–27 | **BUILD NOW** |
+| Order bump | Audio practice tracks / chord workbook / play-along pack | $17–37 | After frontend converts |
+| Mid | Full video course — the deeper method | $97–297 | After frontend converts |
+| Backend | Monthly membership — song breakdowns, community, new lessons | $19–49/mo | The money — build last |
 
-## music_theory_secrets
+**Current CTA:** "Get the free 4-chord cheat sheet → [link]"
+**Hook library:** See CONTENT_STRATEGY.md
+**Traffic engine:** Short-form video (YouTube Shorts / Reels / TikTok) → free cheat sheet → email → book
 
-**Core Offer:** Gospel Piano Method Book
-- What it is: Step-by-step gospel piano theory — chords, progressions, ear training
-- Outcome: Play gospel piano by ear AND understand the theory behind it
-- Differentiator: Written by a church musician, not a classical teacher
-- CTA: "Get the book" / "Start with the free chord chart"
-- Format: Digital download (primary), physical (secondary)
+---
 
-## piano_app
+## colvin_enterprises — High-Ticket Service Ladder
 
-**Core Offer:** Adaptive Piano Learning App
-- What it is: App that learns how you play and adjusts lessons in real time
-- Entry: Free quiz funnel ("What kind of piano player are you?")
-- Outcome: Personalized lesson path from beginner to confident player
-- CTA: "Take the free quiz"
+**Transformation (sell this, not the service):** Reclaim the hours and payroll burned on robot work — without hiring anyone new.
 
-## first_keys_indy
+**The reframe (Golden, Four Levels of Value):** You're not selling "AI automation." You're selling the move off implementation-level cost. Every hour of manual work is paid implementation wages for robot tasks. Sell reclaimed hours, saved payroll, eliminated errors, and capacity to grow without hiring — priced on value created, never hourly.
 
-**Core Offer:** Free First-Time Homebuyer Education
-- What it is: Free guidance on Marion County down payment assistance programs
-- Outcome: Understand what programs you qualify for, what steps to take
-- Compliance: Always recommend speaking with a HUD-approved lender
-- CTA: "Get the free first-time buyer guide"
-- Site: https://first-keys-indy.vercel.app
+**Current build priority:** Drive audit bookings via outreach + one-page booking page.
 
-## funding_ready_indiana
+| Rung | Offer | Price | Status |
+|---|---|---|---|
+| Bait | Free workflow audit — map manual work, quantify monthly cost | Free | **BUILD NOW** |
+| Frontend | Pilot — automate one painful workflow, fixed price | $500–1,500 | After audit converts |
+| Backend | Managed automation retainer | $1–5k/mo | **The money** |
+| Enterprise | Done-for-you system build | $5–25k | Optional / large clients |
 
-**Core Offer:** Free Grant Discovery Consultation
-- What it is: Help Indiana small businesses find grants they may be eligible for
-- Outcome: Leave with a list of relevant funding sources and application guidance
-- Compliance: No guarantee of award, not legal advice
-- CTA: "Book your free funding discovery call"
+**Current CTA:** "Book a free 30-min workflow audit → https://calendar.app.google/igj4Vfwvc1ZUB3Gc9"
+**Hook library:** See CONTENT_STRATEGY.md
+**Traffic engine:** Cold outreach (email / LinkedIn / local Indianapolis), referrals, case-study content
 
-## girls_got_game
+---
 
-**Core Offer:** Youth Leadership + Sports Program (Indianapolis)
-- What it is: After-school and summer program for girls combining sports and leadership
-- Outcome: Girls gain athletic skills and confidence; parents see real leadership development
-- CTA (parents): "Register your daughter"
-- CTA (donors/sponsors): "Support the program"
+## indiana_backflow — Two-Sided Directory (Matchmaker)
 
-## glory_engine
+**Two sides:** Testers/plumbers (the payers) + property managers/consumers (the demand).
 
-**Core Offer:** Faith-Based Comics and Creative Media
-- What it is: Biblical storytelling through comics, short-form video, and creative content
-- Outcome: Engaging faith content that doesn't feel like church homework
-- CTA: "Follow for weekly faith content" / "Download the first issue free"
+**Transformation per side:**
+- Testers: "Booked jobs without marketing spend"
+- Managers: "Certified tester near any Indiana property, found in 60 seconds"
+
+**Current build priority:** Fill listings via tester outreach. SEO/AEO pages compound in background.
+
+**Tester value ladder (they pay):**
+| Rung | Offer | Price | Status |
+|---|---|---|---|
+| Bait | Free basic listing | Free | **BUILD NOW — fill directory** |
+| Frontend | Featured / priority placement | $X/mo | After directory has listings |
+| Backend | Exclusive leads / lead-gen retainer | $X/mo recurring | **The money** |
+
+**Consumer side (demand engine):**
+- SEO/AEO city + service pages — each page's one job: get visitor to book/call a tester
+- Structure pages to rank AND to be the source AI answer engines cite
+
+**Current CTAs:**
+- Testers: "Get your free listing → [link]"
+- Consumers: "Find a certified tester near you → [link]"
+
+---
+
+## first_keys_indy — Realtor Booking Funnel (Two-Sided)
+
+**Two sides:** First-time buyers/sellers (demand) + the agent who pays for booked appointments.
+
+**CRITICAL SEQUENCING:** Land one committed agent BEFORE building the consumer funnel. The funnel has nowhere to send appointments without a paying agent.
+
+**Transformation per side:**
+- Buyers: "Go from confused to confident — and into your first home"
+- Agents: "Consistent, qualified booked appointments without chasing leads"
+
+**Current build priority:** Agent outreach first. Then consumer funnel.
+
+**Agent-client value ladder (they pay):**
+| Rung | Offer | Price | Status |
+|---|---|---|---|
+| Bait | Sample booked appointments (trial) | Free / low | **FIRST MOVE — pitch agents** |
+| Frontend | Monthly appointment block | $X/mo | After agent commits |
+| Backend | Ongoing appointment-gen + ad management retainer | $X/mo recurring | **The money** |
+
+**Consumer funnel (build after agent is committed):**
+Free lead magnet (first-time buyer roadmap / mortgage-readiness checklist) → booking calendar → agent's consult.
+
+**Current CTAs:**
+- Buyers: "Get the free first-time buyer checklist → https://first-keys-indy.vercel.app"
+- Agents: "Book a 15-min call to see how the funnel works → https://calendar.app.google/igj4Vfwvc1ZUB3Gc9"
+
+**Compliance:** Always recommend speaking with a HUD-approved lender. No guarantee of approval or assistance amounts. Tag `katrina_review_required`.
+
+---
+
+## funding_ready_indiana — Grant & Funding Discovery
+
+**Transformation:** Walk away knowing exactly which Indiana funding sources to apply for — and how to qualify.
+
+| Rung | Offer | Price | Status |
+|---|---|---|---|
+| Bait | Free funding discovery call | Free | Active |
+| Frontend | Grant application support / readiness package | $X | TBD |
+
+**Current CTA:** "Book your free funding discovery call → [link]"
+**Compliance:** No guarantee of grant award. Not legal advice. Tag `katrina_review_required`.
+
+---
+
+## paused lanes
+
+### girls_got_game
+- Youth leadership + sports program (Indianapolis)
+- Status: paused — `katrina_review_required` for all content
+
+### glory_engine
+- Faith-based comics and creative media
+- Status: paused
+
+### piano_app
+- Adaptive piano learning app
+- Status: paused — revisit after music_theory_secrets ladder is converting
+
+### youtube_music
+- YouTube channel for music education content
+- Status: paused — revisit after short-form content engine is built
