@@ -33,7 +33,8 @@ if (fs.existsSync(envPath)) {
 // ── Parse args ────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const jsonArg = args.find(a => a.endsWith('.json'));
-const formatArg = args.find(a => a.startsWith('--format'))?.split('=')[1] || args[args.indexOf('--format') + 1];
+const formatFlagIdx = args.indexOf('--format');
+const formatArg = args.find(a => a.startsWith('--format='))?.split('=')[1] || (formatFlagIdx >= 0 ? args[formatFlagIdx + 1] : undefined);
 const sendTelegram = args.includes('--telegram');
 
 if (!jsonArg) {
@@ -124,6 +125,52 @@ if (videoScript.approval_required && videoScript.render_status !== 'approved') {
   console.warn('⚠️  Video not yet approved. Rendering anyway for preview (do not publish).');
   console.warn(`   Status: ${videoScript.render_status}`);
   console.warn('   Set render_status to "approved" after Alfred reviews.\n');
+}
+
+// ── Fetch AI images (DALL-E 3 → Pexels fallback) BEFORE render ───────────────
+// This is a LOCKED step — every render must resolve image assets first.
+// Scenes that have assets[].description but no URL get images generated here.
+// Never skip this step or videos will render without photos.
+const hasUnresolvedAssets = videoScript.scenes.some(
+  sc => sc.assets?.some((a: { url?: string; description?: string }) => !a.url && a.description)
+);
+if (hasUnresolvedAssets) {
+  console.log('📸 Fetching AI images for scenes (DALL-E 3 → Pexels fallback)...\n');
+  try {
+    execSync(`npx ts-node --project remotion/tsconfig.json scripts/fetch-assets.ts ${path.basename(jsonPath)}`, {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: 'inherit',
+    });
+    // Reload the JSON with resolved URLs
+    videoScript = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    // Rebuild props with resolved assets
+    fs.writeFileSync(propsPath, JSON.stringify({ videoScript }));
+    console.log('');
+  } catch (fetchErr) {
+    console.warn('⚠️  fetch-assets failed — rendering with fallback colors. Check OPENAI_API_KEY and PEXELS_API_KEY.\n');
+  }
+}
+
+// ── Generate audio (voiceover + music) BEFORE render ─────────────────────────
+// Generates OpenAI TTS voiceover + fetches Pixabay background music.
+// Updates JSON with voiceover_url and music_url fields.
+// Only runs if either track is missing.
+const needsVoiceover = !videoScript.voiceover_url
+const needsMusic     = !videoScript.music_url
+if (needsVoiceover || needsMusic) {
+  console.log('🔊 Generating audio (voiceover + background music)...\n')
+  try {
+    execSync(`npx ts-node --project remotion/tsconfig.json scripts/generate-audio.ts ${path.basename(jsonPath)}`, {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: 'inherit',
+    })
+    // Reload JSON with resolved audio URLs
+    videoScript = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
+    fs.writeFileSync(propsPath, JSON.stringify({ videoScript }))
+    console.log('')
+  } catch (audioErr) {
+    console.warn('⚠️  generate-audio failed — rendering without audio. Check OPENAI_API_KEY.\n')
+  }
 }
 
 // ── Execute render ────────────────────────────────────────────────────────────

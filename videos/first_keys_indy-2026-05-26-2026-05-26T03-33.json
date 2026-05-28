@@ -1,0 +1,83 @@
+{
+  "video_id": "first_keys_indy-2026-05-26-2026-05-26T03-33",
+  "created_at": "2026-05-26T03:34:57.674Z",
+  "brand": "first_keys_indy",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "title": "Minority Homebuyer Grant Awareness",
+  "audience": "Minority first-time homebuyers in Marion County",
+  "goal": "Encourage viewers to check their eligibility for the grant",
+  "hook": "There's a grant in Marion County that covers your down payment. Most people who qualify don't know it exists.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "There's a grant in Marion County that covers your down payment. Most people who qualify don't know it exists.",
+      "caption_text": "Grant covers down payment",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "There's a grant in Marion County that covers your down payment. Most people who qualify don't know it exists."
+    },
+    {
+      "id": "scene-2",
+      "type": "problem",
+      "duration_seconds": 8,
+      "headline": "Down payment feels out of reach",
+      "body": "If you're a minority first-time homebuyer in Indianapolis, you might think homeownership is out of reach because of the down payment.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "If you're a minority first-time homebuyer in Indianapolis, you might think homeownership is out of reach because of the down payment."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "This grant changes everything",
+      "body": "But here's the truth: this grant can make a home possible without upfront costs.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "But here's the truth: this grant can make a home possible without upfront costs."
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "Real outcomes",
+      "body": "Imagine moving into your own home without worrying about a huge down payment. It happens more often than you think.",
+      "stat": null,
+      "stat_label": null,
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "Imagine moving into your own home without worrying about a huge down payment. It happens more often than you think."
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Check your eligibility",
+      "cta_text": "See if you qualify — it takes 2 minutes",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "See if you qualify — it takes 2 minutes. Talk to a HUD-approved lender today."
+    }
+  ],
+  "voiceover_script": "There's a grant in Marion County that covers your down payment. Most people who qualify don't know it exists. If you're a minority first-time homebuyer in Indianapolis, you might think homeownership is out of reach because of the down payment. But here's the truth: this grant can make a home possible without upfront costs. Imagine moving into your own home without worrying about a huge down payment. It happens more often than you think. See if you qualify — it takes 2 minutes. Talk to a HUD-approved lender today.",
+  "music_direction": "uplifting gospel",
+  "thumbnail_concept": "Smiling couple holding keys to new home",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Minority homebuyers in Indy: Discover a grant for zero down payment. See if you qualify in 2 minutes!",
+  "caption_hook": "Grant covers your down payment",
+  "hashtags": [
+    "#Homeownership",
+    "#IndyRealEstate",
+    "#MinorityHomebuyers"
+  ]
+}

@@ -12,12 +12,9 @@
 name: Daily First Keys Indy Video
 
 on:
-  schedule:
-    # 5am EST Mon-Fri
-    - cron: '0 10 * * 1-5'
-    # 10am EST Sat-Sun
-    - cron: '0 15 * * 0,6'
-  workflow_dispatch:  # Allow manual trigger from GitHub UI
+  # Schedule DISABLED 2026-05-28 — Vercel cron at /api/daily-video is the production trigger.
+  # This workflow remains for manual triggering via GitHub UI.
+  workflow_dispatch:
 
 jobs:
   generate-and-render:

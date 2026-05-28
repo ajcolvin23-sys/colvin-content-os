@@ -7,7 +7,10 @@
 //   5. Per-step failure recovery (retries with corrective context)
 //   6. Context filtering (agents get targeted summaries, not raw full output)
 // ─────────────────────────────────────────────────────────────────────────────
-import OpenAI from 'openai'
+// Reasoning core: Claude Opus 4.5 (planner, Katrina review)
+//                Claude Sonnet 4.5 (assembly, handoffs, memory save)
+//                Claude Haiku 3.5 (QA critic — structured, cheap)
+import { callClaude, callClaudeJSON } from '@/lib/ai/claude'
 import { runGabriel } from './gabriel'
 import { runSolomon } from './solomon'
 import { runGenius } from './genius'
@@ -17,12 +20,6 @@ import type {
   OrchestratorResponse,
   AgentResult,
 } from './types'
-
-let _openai: OpenAI | null = null
-function getOpenAI() {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  return _openai
-}
 
 // ── Compliance triggers — routes through Katrina before output ────────────────
 const KATRINA_TRIGGERS = [
@@ -230,8 +227,6 @@ async function buildGeniusPrompt(
   lane: string | null,
   priorHandoff?: string
 ): Promise<string> {
-  const openai = getOpenAI()
-
   const context = [
     `Agent: ${agent.toUpperCase()}`,
     `Task brief: ${taskBrief}`,
@@ -239,17 +234,18 @@ async function buildGeniusPrompt(
     priorHandoff ? `Prior agent handoff:\n${priorHandoff}` : '',
   ].filter(Boolean).join('\n\n')
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: PROMPT_BUILDER_SYSTEM },
-      { role: 'user', content: context },
-    ],
-    temperature: 0.3,
-    max_tokens: 1200,
-  })
-
-  return response.choices[0].message.content || taskBrief
+  try {
+    const result = await callClaude({
+      taskType: 'agent_planner',
+      system: PROMPT_BUILDER_SYSTEM,
+      user: context,
+      agentName: 'hermes-planner',
+      lane: lane ?? undefined,
+    })
+    return result.text || taskBrief
+  } catch {
+    return taskBrief
+  }
 }
 
 // ── Handoff Summarizer ─────────────────────────────────────────────────────────
@@ -259,25 +255,17 @@ async function buildHandoffSummary(
   nextAgent: AgentName,
   output: string
 ): Promise<string> {
-  const openai = getOpenAI()
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a handoff coordinator. Extract ONLY what ${nextAgent.toUpperCase()} needs from ${completedAgent.toUpperCase()}'s output. Be specific and brief. Do not summarize unnecessarily — include exact copy, keywords, or structure that the next agent needs to use directly. Format as a clean handoff note, not a summary.`,
-      },
-      {
-        role: 'user',
-        content: `${completedAgent.toUpperCase()} produced this output:\n\n${output}\n\nExtract what ${nextAgent.toUpperCase()} specifically needs.`,
-      },
-    ],
-    temperature: 0.2,
-    max_tokens: 600,
-  })
-
-  return response.choices[0].message.content || output
+  try {
+    const result = await callClaude({
+      taskType: 'routing_decisions',
+      system: `You are a handoff coordinator. Extract ONLY what ${nextAgent.toUpperCase()} needs from ${completedAgent.toUpperCase()}'s output. Be specific and brief. Do not summarize unnecessarily — include exact copy, keywords, or structure that the next agent needs to use directly. Format as a clean handoff note, not a summary.`,
+      user: `${completedAgent.toUpperCase()} produced this output:\n\n${output}\n\nExtract what ${nextAgent.toUpperCase()} specifically needs.`,
+      agentName: 'hermes-handoff',
+    })
+    return result.text || output
+  } catch {
+    return output
+  }
 }
 
 // ── QA Critic ─────────────────────────────────────────────────────────────────
@@ -308,22 +296,18 @@ async function runQACritic(
   assembledOutput: string,
   lane: string | null
 ): Promise<string> {
-  const openai = getOpenAI()
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: QA_SYSTEM },
-      {
-        role: 'user',
-        content: `Alfred's original request: "${request}"\nBusiness lane: ${lane || 'general'}\n\nAssembled output:\n\n${assembledOutput}`,
-      },
-    ],
-    temperature: 0.2,
-    max_tokens: 1500,
-  })
-
-  return response.choices[0].message.content || assembledOutput
+  try {
+    const result = await callClaude({
+      taskType: 'qa_review',
+      system: QA_SYSTEM,
+      user: `Alfred's original request: "${request}"\nBusiness lane: ${lane || 'general'}\n\nAssembled output:\n\n${assembledOutput}`,
+      agentName: 'qa-critic',
+      lane: lane ?? undefined,
+    })
+    return result.text || assembledOutput
+  } catch {
+    return assembledOutput
+  }
 }
 
 // ── Katrina Governance Review ──────────────────────────────────────────────────
@@ -355,22 +339,18 @@ async function runKatrinaReview(
   output: string,
   lane: string | null
 ): Promise<string> {
-  const openai = getOpenAI()
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: KATRINA_SYSTEM },
-      {
-        role: 'user',
-        content: `Request: "${request}"\nLane: ${lane || 'general'}\n\nOutput to review:\n\n${output}`,
-      },
-    ],
-    temperature: 0.2,
-    max_tokens: 1000,
-  })
-
-  return response.choices[0].message.content || ''
+  try {
+    const result = await callClaude({
+      taskType: 'compliance_review',
+      system: KATRINA_SYSTEM,
+      user: `Request: "${request}"\nLane: ${lane || 'general'}\n\nOutput to review:\n\n${output}`,
+      agentName: 'katrina',
+      lane: lane ?? undefined,
+    })
+    return result.text
+  } catch {
+    return ''
+  }
 }
 
 // ── Memory / Obsidian Save Recommendation ────────────────────────────────────
@@ -379,14 +359,7 @@ async function buildMemorySaveRecommendation(
   finalOutput: string,
   lane: string | null
 ): Promise<string> {
-  const openai = getOpenAI()
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `You are the Obsidian Memory Architect for Alfred Colvin's Hermes system.
+  const memorySystem = `You are the Obsidian Memory Architect for Alfred Colvin's Hermes system.
 
 Evaluate whether this output should be saved to Obsidian as a reusable note.
 
@@ -395,23 +368,25 @@ SAVE if the output contains: reusable prompts, agent files, workflows, SOPs, che
 DO NOT SAVE if the output is: a one-off draft, random temporary details, unsupported assumptions, or something Alfred will never reuse.
 
 Return this format:
-## 💾 Memory / Obsidian Save Recommendation
+## Memory / Obsidian Save Recommendation
 **Save?** Yes / No
 **Why:** [one sentence]
 **Folder:** [/01 Active Projects | /03 AI Agents | /04 Sales & Marketing | /06 Software Development | /10 Research Library | /11 SOPs & Checklists | /12 Prompts | /13 Decisions | /14 Templates]
 **Note Title:** [title]
-**Tags:** #tag1 #tag2 #tag3`,
-      },
-      {
-        role: 'user',
-        content: `Request: "${request}"\nLane: ${lane || 'general'}\n\nOutput preview (first 800 chars):\n${finalOutput.slice(0, 800)}`,
-      },
-    ],
-    temperature: 0.2,
-    max_tokens: 250,
-  })
+**Tags:** #tag1 #tag2 #tag3`
 
-  return response.choices[0].message.content || ''
+  try {
+    const result = await callClaude({
+      taskType: 'routing_decisions',
+      system: memorySystem,
+      user: `Request: "${request}"\nLane: ${lane || 'general'}\n\nOutput preview (first 800 chars):\n${finalOutput.slice(0, 800)}`,
+      agentName: 'memory-architect',
+      lane: lane ?? undefined,
+    })
+    return result.text
+  } catch {
+    return ''
+  }
 }
 
 // ── Final Assembly ─────────────────────────────────────────────────────────────
@@ -431,8 +406,6 @@ async function assembleFinalOutput(
   qaResult?: string,
   katrinaResult?: string
 ): Promise<string> {
-  const openai = getOpenAI()
-
   if (results.length === 1 && results[0].success && !qaResult && !katrinaResult) {
     return results[0].output
   }
@@ -445,17 +418,19 @@ async function assembleFinalOutput(
     qaResult ? `## QA CRITIC REVIEW\n${qaResult}` : '',
   ].filter(Boolean).join('\n\n---\n\n')
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: ASSEMBLER_SYSTEM },
-      { role: 'user', content: `Alfred's request: "${request}"\n\n${sections}` },
-    ],
-    temperature: 0.3,
-    max_tokens: 3500,
-  })
-
-  return response.choices[0].message.content || sections
+  try {
+    const result = await callClaude({
+      taskType: 'content_generation',
+      system: ASSEMBLER_SYSTEM,
+      user: `Alfred's request: "${request}"\n\n${sections}`,
+      maxTokensOverride: 3500,
+      temperatureOverride: 0.3,
+      agentName: 'hermes-assembler',
+    })
+    return result.text || sections
+  } catch {
+    return sections
+  }
 }
 
 // ── Phase 1: Plan ─────────────────────────────────────────────────────────────
@@ -464,20 +439,17 @@ async function buildPlan(request: string): Promise<OrchestratorPlan & {
   requires_katrina: boolean
   requires_qa: boolean
 }> {
-  const openai = getOpenAI()
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: PLANNER_PROMPT },
-      { role: 'user', content: `Alfred's request: "${request}"` },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.2,
+  const { json } = await callClaudeJSON<OrchestratorPlan & {
+    prompt_pattern: string
+    requires_katrina: boolean
+    requires_qa: boolean
+  }>({
+    taskType: 'agent_planner',
+    system: PLANNER_PROMPT,
+    user: `Alfred's request: "${request}"`,
+    agentName: 'hermes-planner',
   })
-
-  const raw = response.choices[0].message.content || '{}'
-  return JSON.parse(raw)
+  return json
 }
 
 // ── Phase 2: Execute ──────────────────────────────────────────────────────────
@@ -540,9 +512,10 @@ async function executePlan(
       }
 
       // Build structured Genius Prompt for this agent
+      const taskBrief = step.task_brief || step.task
       const geniusPrompt = await buildGeniusPrompt(
         step.agent,
-        (step as any).task_brief || step.task,
+        taskBrief,
         plan.lane,
         handoff
       )
@@ -553,7 +526,7 @@ async function executePlan(
         // One retry with explicit failure context
         const retryPrompt = await buildGeniusPrompt(
           step.agent,
-          `RETRY — previous attempt failed: ${result.error}\n\nOriginal task: ${(step as any).task_brief || step.task}`,
+          `RETRY — previous attempt failed: ${result.error}\n\nOriginal task: ${taskBrief}`,
           plan.lane,
           handoff
         )

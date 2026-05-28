@@ -1,8 +1,8 @@
 name: Gabriel Daily Run
 
+# Schedule DISABLED 2026-05-28 — Vercel cron at /api/scheduler is the production trigger.
+# This workflow remains for manual triggering via GitHub UI.
 on:
-  schedule:
-    - cron: '0 13 * * *'
   workflow_dispatch:
 
 permissions:

@@ -1,12 +1,7 @@
 // ─── Gabriel — Content & Automation Agent ─────────────────────────────────────
-import OpenAI from 'openai'
+// Reasoning: Claude Sonnet 4.5 (configured via model-routing.json → 'content_generation')
+import { callClaude } from '@/lib/ai/claude'
 import type { AgentResult } from './types'
-
-let _openai: OpenAI | null = null
-function getOpenAI() {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  return _openai
-}
 
 const GABRIEL_SYSTEM_PROMPT = `You are Gabriel — the Content and Automation Agent inside the Colvin Hermes operating system.
 
@@ -50,27 +45,22 @@ You are Alfred Colvin's dedicated content strategist, writer, and automation bui
 - You write the content. Others optimize it.`
 
 export async function runGabriel(task: string, priorContext?: string): Promise<AgentResult> {
-  const openai = getOpenAI()
-
   const userMessage = priorContext
     ? `CONTEXT FROM PRIOR STEP:\n${priorContext}\n\n---\n\nYOUR TASK:\n${task}`
     : task
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: GABRIEL_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0.8,
-      max_tokens: 2000,
+    const result = await callClaude({
+      taskType: 'content_generation',
+      system: GABRIEL_SYSTEM_PROMPT,
+      user: userMessage,
+      agentName: 'gabriel',
     })
 
     return {
       agent: 'gabriel',
       task,
-      output: response.choices[0].message.content || '',
+      output: result.text,
       success: true,
     }
   } catch (err) {
@@ -79,7 +69,7 @@ export async function runGabriel(task: string, priorContext?: string): Promise<A
       task,
       output: '',
       success: false,
-      error: String(err),
+      error: err instanceof Error ? err.message : String(err),
     }
   }
 }

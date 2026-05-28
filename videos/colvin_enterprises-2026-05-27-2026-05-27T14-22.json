@@ -1,0 +1,106 @@
+{
+  "video_id": "colvin_enterprises-2026-05-27-2026-05-27T14-22",
+  "created_at": "2026-05-27T14:33:09.700Z",
+  "brand": "colvin_enterprises",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "composition_id": "ColvinEnterpriseAd",
+  "title": "Workflow Audit Promo",
+  "audience": "Small business owners and entrepreneurs",
+  "goal": "Book a free 30-min workflow audit",
+  "hook": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+      "caption_text": "The hidden cost of work",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "A business professional looking overwhelmed and stressed at a cluttered desk filled with papers, working late into the night.",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/8468122/pexels-photo-8468122.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-2",
+      "type": "pain",
+      "duration_seconds": 4,
+      "lines": [
+        "Overwhelmed? You're not alone.",
+        "Stuck in manual tasks?",
+        "There's hope ahead."
+      ],
+      "headline": "Are you feeling stuck?",
+      "motion": "kinetic",
+      "transition": "cut",
+      "voiceover": "If you're feeling overwhelmed, working late, and buried under a mountain of tasks, you're not alone. Many business owners are trapped in a cycle of tedious manual work."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "Reclaim your time",
+      "body": "By identifying and streamlining your workflows, you can reduce the time spent on repetitive tasks.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "But what if I told you there's a way to reclaim those hours? By identifying and streamlining your workflows, you can reduce the time spent on repetitive tasks."
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "Feel the difference",
+      "body": "Imagine stepping into your office feeling relaxed and confident, knowing that everything is running smoothly.",
+      "stat": null,
+      "stat_label": null,
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "Imagine stepping into your office feeling relaxed and confident, knowing that everything is running smoothly.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "A business professional looking relaxed and successful in a modern office, confidently managing their tasks.",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/7875867/pexels-photo-7875867.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Take action now",
+      "cta_text": "Book a free 30-min workflow audit",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Book a free 30-minute workflow audit today and take the first step towards freeing up your time and resources."
+    }
+  ],
+  "voiceover_script": "The most expensive thing in your business isn't software. It's manual work disguised as a job description. If you're feeling overwhelmed, working late, and buried under a mountain of tasks, you're not alone. Many business owners are trapped in a cycle of tedious manual work. But what if I told you there's a way to reclaim those hours? By identifying and streamlining your workflows, you can reduce the time spent on repetitive tasks. Imagine stepping into your office feeling relaxed and confident, knowing that everything is running smoothly. Book a free 30-minute workflow audit today and take the first step towards freeing up your time and resources.",
+  "music_direction": "ambient gospel piano",
+  "thumbnail_concept": "A split image showing an overwhelmed worker on one side and a relaxed professional on the other.",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Tired of manual work? Book a free workflow audit with us!",
+  "caption_hook": "Reclaim your time today",
+  "hashtags": [
+    "#businessworkflow",
+    "#freeaudit",
+    "#smallbusiness"
+  ]
+}

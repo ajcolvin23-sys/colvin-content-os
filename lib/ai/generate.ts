@@ -1,5 +1,9 @@
-// AI content generation — routes by lane and type
-import OpenAI from 'openai'
+// ─── AI Content Generation — Claude-First ────────────────────────────────────
+// Routes by lane and content type. All reasoning goes through Claude
+// (Sonnet for content, Opus for conversion variant scoring, Haiku for outreach).
+// See automation-os/config/model-routing.json for per-task model selection.
+// ─────────────────────────────────────────────────────────────────────────────
+import { callClaudeJSON } from './claude'
 import type {
   GenerateContentRequest,
   GenerateVideoScriptRequest,
@@ -8,14 +12,7 @@ import type {
   ConversionVariant,
 } from '@/types'
 
-// Lazily instantiated so build-time page collection doesn't fail without env vars
-let _openai: OpenAI | null = null
-function getOpenAI(): OpenAI {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  return _openai
-}
-
-// ── Prompt templates ──────────────────────────────────────────────────────────
+// ── Brand Voice + Lane Context ────────────────────────────────────────────────
 
 const ALFRED_VOICE = `Alfred Colvin's voice rules:
 - Direct, faith-rooted, entrepreneurial
@@ -45,11 +42,35 @@ const COLVIN_CONTEXT = `Alfred's Colvin Enterprises brand:
 - Target: local businesses, churches, coaches, consultants, nonprofits
 - No hype, focus on real outcomes: time saved, leads captured, revenue earned`
 
+const MUSIC_THEORY_SECRETS_CONTEXT = `Alfred's Music Theory Secrets brand:
+- Free 4-chord cheat sheet lead magnet — do NOT promote paid course or membership yet
+- Target: adult beginners, church musicians, gospel piano players, producers
+- Core message: "4 chords. That's all you need to play the songs you love by ear."
+- Platform focus: Facebook, TikTok
+- CTA: "Get the free 4-chord cheat sheet"
+- COMPLIANCE: Never promise skill outcomes in a fixed timeframe without qualification`
+
+const FIRST_KEYS_INDY_CONTEXT = `Alfred's First Keys Indy brand:
+- Marion County homebuyer assistance grant for minority first-time buyers
+- Grant covers down payment — does NOT need to be repaid
+- Target: minority first-time homebuyers in Indianapolis / Marion County who believe homeownership is out of reach
+- Platform focus: Facebook, TikTok
+- CTA: "See if you qualify — it takes 2 minutes" → https://first-keys-indy.vercel.app
+- COMPLIANCE (mandatory — never omit):
+  - Never guarantee grant approval
+  - Never state exact dollar amounts unless verified
+  - Always include: "Speak with a HUD-approved lender to confirm eligibility."
+  - Tag: katrina_review_required`
+
 function getLaneContext(lane: string): string {
   switch (lane) {
-    case 'piano': return PIANO_CONTEXT
-    case 'backflow': return BACKFLOW_CONTEXT
-    case 'colvin_enterprises': return COLVIN_CONTEXT
+    case 'piano':
+    case 'music_theory_secrets': return MUSIC_THEORY_SECRETS_CONTEXT
+    case 'backflow':
+    case 'indiana_backflow': return BACKFLOW_CONTEXT
+    case 'first_keys_indy': return FIRST_KEYS_INDY_CONTEXT
+    case 'colvin_enterprises':
+    case 'funding_ready_indiana': return COLVIN_CONTEXT
     default: return COLVIN_CONTEXT
   }
 }
@@ -73,11 +94,9 @@ export async function generateContent(req: GenerateContentRequest): Promise<{
     multi: 'Multi-platform content. Write a core version that can be adapted.',
   }
 
-  const prompt = `${ALFRED_VOICE}
+  const system = `${ALFRED_VOICE}\n\n${getLaneContext(req.lane)}`
 
-${getLaneContext(req.lane)}
-
-TASK: Create a ${req.content_type} for ${req.platform.toUpperCase()}.
+  const user = `TASK: Create a ${req.content_type} for ${req.platform.toUpperCase()}.
 Topic: ${req.topic}
 ${req.target_audience ? `Target audience: ${req.target_audience}` : ''}
 ${req.cta ? `CTA: ${req.cta}` : ''}
@@ -96,22 +115,28 @@ Return JSON:
   "visual_direction": "what visual/image/B-roll to use"
 }`
 
-  const res = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 800,
-    temperature: 0.6,
-    response_format: { type: 'json_object' },
+  const { json } = await callClaudeJSON<{
+    hook?: string
+    body?: string
+    caption?: string
+    cta?: string
+    hashtags?: unknown
+    visual_direction?: string
+  }>({
+    taskType: 'content_generation',
+    system,
+    user,
+    lane: req.lane,
+    agentName: 'gabriel-content',
   })
 
-  const parsed = JSON.parse(res.choices[0].message.content || '{}')
   return {
-    hook: parsed.hook || '',
-    body: parsed.body || '',
-    caption: parsed.caption || '',
-    cta: parsed.cta || '',
-    hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
-    visual_direction: parsed.visual_direction || '',
+    hook: json.hook || '',
+    body: json.body || '',
+    caption: json.caption || '',
+    cta: json.cta || '',
+    hashtags: Array.isArray(json.hashtags) ? json.hashtags as string[] : [],
+    visual_direction: json.visual_direction || '',
   }
 }
 
@@ -147,11 +172,9 @@ export async function generateConversionOptimized(
   const platformRules = CONVERSION_RULES[req.platform] || CONVERSION_RULES.multi
   const laneContext = getLaneContext(req.lane)
 
-  const prompt = `${ALFRED_VOICE}
+  const system = `${ALFRED_VOICE}\n\n${laneContext}`
 
-${laneContext}
-
-TASK: Generate 3 conversion-optimized content variants for ${req.platform.toUpperCase()}.
+  const user = `TASK: Generate 3 conversion-optimized content variants for ${req.platform.toUpperCase()}.
 Topic: ${req.topic}
 ${req.target_audience ? `Target audience: ${req.target_audience}` : ''}
 ${req.cta ? `Desired CTA: ${req.cta}` : ''}
@@ -201,18 +224,20 @@ Return JSON:
   "winner_reasoning": "Why this variant will convert best for this topic, platform, and audience. Reference the specific hook mechanism and CTA alignment."
 }`
 
-  const res = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 2400,
-    temperature: 0.65,
-    response_format: { type: 'json_object' },
+  const { json: parsed } = await callClaudeJSON<{
+    variants?: Record<string, unknown>[]
+    winner_index?: number
+    winner_reasoning?: string
+  }>({
+    taskType: 'content_variants',
+    system,
+    user,
+    lane: req.lane,
+    agentName: 'genius-conversion',
   })
 
-  const parsed = JSON.parse(res.choices[0].message.content || '{}')
-
   // Normalize and validate variants
-  const variants: ConversionVariant[] = (parsed.variants || []).map((v: Record<string, unknown>) => {
+  const variants: ConversionVariant[] = (parsed.variants ?? []).map((v: Record<string, unknown>) => {
     const hookType = v.hook_type as 'story' | 'pain' | 'curiosity'
     const scores = (v.scores as Record<string, number>) || {}
     const total = (scores.hook_strength || 0) + (scores.body_clarity || 0) + (scores.cta_power || 0) + (scores.platform_fit || 0)
@@ -236,7 +261,6 @@ Return JSON:
     }
   })
 
-  // Fallback: pick winner by highest total score if model didn't specify
   const winnerIndex = typeof parsed.winner_index === 'number'
     ? Math.min(parsed.winner_index, variants.length - 1)
     : variants.reduce((best, v, i) => v.scores.total > variants[best].scores.total ? i : best, 0)
@@ -255,10 +279,9 @@ export async function generateVideoScript(
 ): Promise<GeneratedVideoScript> {
   const slideCount = req.slide_count || 7
 
-  const prompt = `${ALFRED_VOICE}
-${PIANO_CONTEXT}
+  const system = `${ALFRED_VOICE}\n${PIANO_CONTEXT}`
 
-TASK: Write a ${req.platform === 'tiktok' ? 'TikTok' : 'YouTube Shorts'} piano lesson slideshow video script.
+  const user = `TASK: Write a ${req.platform === 'tiktok' ? 'TikTok' : 'YouTube Shorts'} piano lesson slideshow video script.
 
 Topic: ${req.topic}
 Lesson objective: ${req.lesson_objective}
@@ -304,22 +327,30 @@ Return JSON:
   "cta": "call to action"
 }`
 
-  const res = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 1500,
-    temperature: 0.5,
-    response_format: { type: 'json_object' },
+  const { json: parsed } = await callClaudeJSON<{
+    title?: string
+    hook?: string
+    slides?: unknown[]
+    full_voiceover?: string
+    caption?: string
+    hashtags?: unknown
+    thumbnail_text?: string
+    cta?: string
+  }>({
+    taskType: 'video_script',
+    system,
+    user,
+    lane: 'piano',
+    agentName: 'gabriel-video',
   })
 
-  const parsed = JSON.parse(res.choices[0].message.content || '{}')
   return {
     title: parsed.title || req.topic,
     hook: parsed.hook || '',
-    slides: Array.isArray(parsed.slides) ? parsed.slides : [],
+    slides: Array.isArray(parsed.slides) ? parsed.slides as GeneratedVideoScript['slides'] : [],
     full_voiceover: parsed.full_voiceover || '',
     caption: parsed.caption || '',
-    hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
+    hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags as string[] : [],
     thumbnail_text: parsed.thumbnail_text || '',
     cta: parsed.cta || req.cta,
   }
@@ -335,10 +366,9 @@ export async function generateOutreachDraft(prospect: {
   pain_hypothesis?: string
   offer_fit?: string
 }): Promise<{ connection_request: string; follow_up: string; risk_notes: string }> {
-  const prompt = `${ALFRED_VOICE}
-${COLVIN_CONTEXT}
+  const system = `${ALFRED_VOICE}\n${COLVIN_CONTEXT}`
 
-TASK: Write a LinkedIn connection request and follow-up for Alfred Colvin.
+  const user = `TASK: Write a LinkedIn connection request and follow-up for Alfred Colvin.
 
 Prospect:
 Name: ${prospect.name}
@@ -363,15 +393,18 @@ Return JSON:
   "risk_notes": "anything to verify before sending"
 }`
 
-  const res = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 600,
-    temperature: 0.4,
-    response_format: { type: 'json_object' },
+  const { json: parsed } = await callClaudeJSON<{
+    connection_request?: string
+    follow_up?: string
+    risk_notes?: string
+  }>({
+    taskType: 'outreach_drafts',
+    system,
+    user,
+    lane: 'colvin_enterprises',
+    agentName: 'gabriel-outreach',
   })
 
-  const parsed = JSON.parse(res.choices[0].message.content || '{}')
   return {
     connection_request: parsed.connection_request || '',
     follow_up: parsed.follow_up || '',

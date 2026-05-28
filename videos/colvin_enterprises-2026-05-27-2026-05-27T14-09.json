@@ -1,0 +1,106 @@
+{
+  "video_id": "colvin_enterprises-2026-05-27-2026-05-27T14-09",
+  "created_at": "2026-05-27T14:15:20.886Z",
+  "brand": "colvin_enterprises",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "composition_id": "ColvinEnterpriseAd",
+  "title": "Reclaim Your Time",
+  "audience": "business professionals overwhelmed by manual work",
+  "goal": "book a free workflow audit",
+  "hook": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+      "caption_text": "The cost of manual work",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "A business professional looking overwhelmed, stressed, and working late at a cluttered desk filled with papers.",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/7984780/pexels-photo-7984780.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-2",
+      "type": "pain",
+      "duration_seconds": 4,
+      "lines": [
+        "Stressed and overworked?",
+        "Endless tasks piling up?",
+        "There's a better way."
+      ],
+      "headline": "Are you feeling stuck?",
+      "motion": "kinetic",
+      "transition": "cut",
+      "voiceover": "Do you find yourself working late, buried under a mountain of tasks? This is more than just busy work; it’s robbing you of time and energy."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "You can reclaim your time!",
+      "body": "Imagine a workplace where you can reclaim those hours spent on repetitive tasks. The truth is, you can streamline your operations without hiring new staff.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "You deserve to focus on what really matters. By identifying inefficiencies, we can transform your workflow."
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "Transform your workflow",
+      "body": "By streamlining processes, many businesses have seen significant improvements in efficiency and morale (example).",
+      "stat": null,
+      "stat_label": null,
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "This isn’t just a dream; it’s possible.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "A business professional looking relaxed and confident in a modern office, free from the burden of stress.",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/8279498/pexels-photo-8279498.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Take action now!",
+      "cta_text": "Book a free 30-min workflow audit",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Book a free 30-min workflow audit today and take the first step towards a more productive future."
+    }
+  ],
+  "voiceover_script": "The most expensive thing in your business isn't software. It's manual work disguised as a job description. Do you find yourself working late, buried under a mountain of tasks? This is more than just busy work; it’s robbing you of time and energy. You deserve to focus on what really matters. Imagine a workplace where you can reclaim those hours spent on repetitive tasks. The truth is, you can streamline your operations without hiring new staff. By identifying inefficiencies, we can transform your workflow. This isn’t just a dream; it’s possible. Book a free 30-min workflow audit today and take the first step towards a more productive future.",
+  "music_direction": "ambient gospel piano",
+  "thumbnail_concept": "A stressed worker surrounded by paperwork contrasting with a relaxed, successful individual in a modern office.",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Manual work is draining your resources. Book a free 30-min workflow audit and reclaim your time!",
+  "caption_hook": "Stop wasting precious hours",
+  "hashtags": [
+    "#BusinessEfficiency",
+    "#WorkflowAudit",
+    "#ColvinEnterprises"
+  ]
+}

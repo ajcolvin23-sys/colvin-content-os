@@ -6,6 +6,14 @@
  *
  * Gabriel writes JSON → SceneRenderer picks the component → video renders.
  * Never edit this file per-video. Add new scene types here when needed.
+ *
+ * Routing rules:
+ *  1. Cinematic scene types (pain_stack, desire, mechanism, transformation)
+ *     always use their dedicated component — they handle images internally.
+ *  2. CTA always uses CTAScene — handles images internally.
+ *  3. For generic types (hook, problem, solution, proof) that have a resolved
+ *     image asset, ImageOverlayScene is used for full cinematic treatment.
+ *  4. All remaining types fall through to SlideScene.
  */
 import React from 'react';
 import type { BrandConfig, SceneDefinition } from './types';
@@ -16,6 +24,10 @@ import { ProofScene } from './scenes/ProofScene';
 import { CTAScene } from './scenes/CTAScene';
 import { SlideScene } from './scenes/SlideScene';
 import { ImageOverlayScene } from './scenes/ImageOverlayScene';
+import { PainStackScene } from './scenes/PainStackScene';
+import { DesireScene } from './scenes/DesireScene';
+import { MechanismScene } from './scenes/MechanismScene';
+import { TransformationScene } from './scenes/TransformationScene';
 
 interface Props {
   scene: SceneDefinition;
@@ -34,11 +46,30 @@ export const SceneRenderer: React.FC<Props> = ({
 }) => {
   const commonProps = { scene, brand, localFrame, durationInFrames };
 
-  // If the scene has a resolved image asset, always use ImageOverlayScene
+  // ── Cinematic scene types: dedicated components (handle their own images) ──
+  switch (scene.type) {
+    case 'pain_stack':
+      return <PainStackScene {...commonProps} />;
+
+    case 'desire':
+      return <DesireScene {...commonProps} />;
+
+    case 'mechanism':
+      return <MechanismScene {...commonProps} />;
+
+    case 'transformation':
+      return <TransformationScene {...commonProps} />;
+
+    case 'cta':
+      return <CTAScene {...commonProps} />;
+  }
+
+  // ── Generic types: use ImageOverlayScene if image resolved ────────────────
   if (scene.assets?.[0]?.url) {
     return <ImageOverlayScene {...commonProps} />;
   }
 
+  // ── Fallback: brand-color component matching scene type ───────────────────
   switch (scene.type) {
     case 'hook':
       return <HookScene {...commonProps} />;
@@ -52,9 +83,6 @@ export const SceneRenderer: React.FC<Props> = ({
     case 'proof':
       return <ProofScene {...commonProps} />;
 
-    case 'cta':
-      return <CTAScene {...commonProps} />;
-
     case 'step':
       return <SlideScene {...commonProps} sceneIndex={sceneIndex} />;
 
@@ -63,7 +91,6 @@ export const SceneRenderer: React.FC<Props> = ({
     case 'lower_third':
     case 'countdown':
     default:
-      // Generic slide handles all remaining types
       return <SlideScene {...commonProps} sceneIndex={sceneIndex} />;
   }
 };

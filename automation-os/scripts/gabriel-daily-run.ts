@@ -12,6 +12,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
+import * as zlib from 'zlib';
 
 // Load .env.local before any env var access
 const envPath = path.resolve(__dirname, '../../.env.local');
@@ -29,6 +30,8 @@ if (fs.existsSync(envPath)) {
 
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+import { buildGabrielSystemPrelude } from '../../lib/agents/skill-loader';
 
 // ── Environment ─────────────────────────────────────────────────────────────
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -63,6 +66,37 @@ const SKIPPED_LANES: Array<{ lane: string; reason: string; query?: string }> = [
 // ── Clients ──────────────────────────────────────────────────────────────────
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
+
+// Cached system prelude — loaded once per process, applied to every Gabriel call
+// so the cron runner gets the same guardrails as a human Claude session.
+let _systemPrelude: string | null = null;
+function getSystemPrelude(lane?: string): string {
+  if (_systemPrelude === null) {
+    try {
+      _systemPrelude = buildGabrielSystemPrelude({
+        lane,
+        includeLockedUpgrades: true,
+        includeSafety: true,
+      });
+    } catch {
+      _systemPrelude = '';
+    }
+  }
+  // If lane-specific compliance is needed and prelude was cached without lane, rebuild
+  if (lane && _systemPrelude && !_systemPrelude.includes('LANE COMPLIANCE')) {
+    try {
+      return buildGabrielSystemPrelude({
+        lane,
+        includeLockedUpgrades: true,
+        includeSafety: true,
+      });
+    } catch {
+      return _systemPrelude;
+    }
+  }
+  return _systemPrelude;
+}
 
 function toDbScore(score: number | null | undefined): number {
   const value = Number(score ?? 0);
@@ -95,7 +129,7 @@ interface GabrielConfig {
   active_lanes: string[];
   lane_strategy: Record<string, LaneStrategy>;
   lead_scout: { max_leads_per_lane_per_run: number; min_qualification_score: number };
-  outreach: { max_drafts_per_run: number };
+  outreach: { max_drafts_per_run: number; email_max_words?: number };
   content: { max_pieces_per_run: number };
   model_routing: Record<string, string>;
   compliance: { katrina_gate_lanes: string[]; katrina_gate_keywords: string[] };
@@ -248,19 +282,103 @@ async function logAIUsage(params: {
   }
 }
 
-// ── GPT Helper (with logging + retry) ────────────────────────────────────────
+// Strip ```json / ``` fences and leading prose. Claude wraps structured output
+// even when asked not to; OpenAI w/response_format doesn't but is now bypassed.
+function stripMarkdownFences(text: string): string {
+  let cleaned = text.trim();
+  // Remove leading prose before the first { or [
+  const firstBrace = cleaned.search(/[{[]/);
+  if (firstBrace > 0) {
+    const prefix = cleaned.slice(0, firstBrace);
+    // Only strip prefix if it looks like markdown ("```", "Here is", etc.)
+    if (/^```|^here|^output|^json/i.test(prefix.trim())) {
+      cleaned = cleaned.slice(firstBrace);
+    }
+  }
+  // Strip trailing ``` fences
+  cleaned = cleaned.replace(/\s*```\s*$/i, '').trim();
+  return cleaned;
+}
+
+// ── Unified AI Helper — routes Claude vs OpenAI by model prefix ──────────────
+// Reasoning core: Claude. OpenAI reserved for bulk dedup (gpt-4o-mini).
+// Injects Gabriel system prelude (LOCKED_UPGRADES + SAFETY) automatically.
+// Falls back to OpenAI if Claude API call fails after retries.
 async function callGPT(
   model: string,
   systemPrompt: string,
   userPrompt: string,
-  opts?: { taskType?: string; lane?: string; maxTokens?: number; temperature?: number }
+  opts?: { taskType?: string; lane?: string; maxTokens?: number; temperature?: number; includePrelude?: boolean }
 ): Promise<string> {
+  const isClaudeModel = model.startsWith('claude-');
+
+  // Prelude injection is OPT-IN. Bulk JSON-mode calls (lead extraction, content
+  // generation that expects clean JSON) should NOT receive the prelude — it
+  // makes the model verbose and breaks JSON parsing. Use opts.includePrelude
+  // only for high-stakes reasoning tasks where the safety/locked rules matter.
+  const wantsPrelude = opts?.includePrelude === true;
+  const fullSystem = wantsPrelude
+    ? `${getSystemPrelude(opts?.lane)}\n\n---\n\n# TASK-SPECIFIC INSTRUCTIONS\n\n${systemPrompt}`
+    : systemPrompt;
+
+  // Route to Claude when configured and key present
+  if (isClaudeModel && anthropic) {
+    // Opus 4.6+ deprecated the temperature parameter
+    const isNewOpus = /^claude-opus-4-([6-9]|\d{2,})/.test(model);
+    const start = Date.now();
+    try {
+      const response = await withRetry(() => anthropic.messages.create({
+        model,
+        max_tokens: opts?.maxTokens ?? 2000,
+        ...(isNewOpus ? {} : { temperature: opts?.temperature ?? 0.7 }),
+        system: fullSystem,
+        messages: [{ role: 'user', content: userPrompt }],
+      }), `callClaude:${opts?.taskType || model}`);
+      const rawContent = response.content
+        .filter(block => block.type === 'text')
+        .map(block => (block.type === 'text' ? block.text : ''))
+        .join('');
+      // Claude sometimes wraps JSON in markdown fences. Strip them so existing
+      // JSON.parse() call sites work without changes.
+      const content = stripMarkdownFences(rawContent);
+      logAIUsage({
+        provider: 'anthropic', model,
+        taskType: opts?.taskType || 'general',
+        lane: opts?.lane,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        durationMs: Date.now() - start,
+        status: content ? 'success' : 'empty_response',
+      }).catch(() => {});
+      return content;
+    } catch (err) {
+      logAIUsage({
+        provider: 'anthropic', model,
+        taskType: opts?.taskType || 'general',
+        lane: opts?.lane,
+        durationMs: Date.now() - start,
+        status: 'error',
+        errorMessage: String(err).slice(0, 200),
+      }).catch(() => {});
+      // Fall through to OpenAI fallback below
+      console.warn(`[Gabriel] Claude call failed for ${opts?.taskType}, falling back to OpenAI: ${String(err).slice(0, 80)}`);
+      return callGPT('gpt-4o-mini', systemPrompt, userPrompt, { ...opts, maxTokens: opts?.maxTokens });
+    }
+  }
+
+  // Claude model requested but no API key — log a warning once, fall back
+  if (isClaudeModel && !anthropic) {
+    console.warn(`[Gabriel] ANTHROPIC_API_KEY missing — falling back to gpt-4o-mini for ${opts?.taskType}`);
+    return callGPT('gpt-4o-mini', systemPrompt, userPrompt, opts);
+  }
+
+  // OpenAI path
   const start = Date.now();
   try {
     const response = await withRetry(() => openai.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: fullSystem },
         { role: 'user', content: userPrompt },
       ],
       temperature: opts?.temperature ?? 0.7,
@@ -291,58 +409,23 @@ async function callGPT(
   }
 }
 
-// ── Claude Helper (Anthropic — claude-haiku-3-5 for fast analysis) ────────────
-// Used for: deduplication verification, categorization, score cross-check
-// Falls back to gpt-4o-mini if ANTHROPIC_API_KEY not set
+// ── Claude Helper (thin wrapper around callGPT for backward compat) ──────────
+// All Claude routing now goes through callGPT() which detects 'claude-' prefix
+// and routes to the Anthropic SDK with logging + retries + system prelude.
 async function callClaude(
   prompt: string,
   opts?: { taskType?: string; lane?: string; model?: string }
 ): Promise<string> {
-  if (!ANTHROPIC_API_KEY) {
-    return callGPT('gpt-4o-mini', 'You are a helpful assistant.', prompt, opts);
-  }
   const model = opts?.model || 'claude-haiku-3-5';
-  const start = Date.now();
-  return new Promise((resolve) => {
-    const body = JSON.stringify({
-      model,
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }],
+  try {
+    return await callGPT(model, 'You are a helpful assistant.', prompt, {
+      taskType: opts?.taskType,
+      lane: opts?.lane,
+      maxTokens: 1000,
     });
-    const req = https.request({
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
-    }, (res) => {
-      let data = '';
-      res.on('data', c => { data += c; });
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          const text = parsed.content?.[0]?.text ?? '';
-          logAIUsage({
-            provider: 'anthropic', model,
-            taskType: opts?.taskType || 'general', lane: opts?.lane,
-            inputTokens: parsed.usage?.input_tokens || 0,
-            outputTokens: parsed.usage?.output_tokens || 0,
-            durationMs: Date.now() - start,
-            status: text ? 'success' : 'empty_response',
-          }).catch(() => {});
-          resolve(text);
-        } catch { resolve(''); }
-      });
-    });
-    req.on('error', () => resolve(''));
-    req.setTimeout(20000, () => { req.destroy(); resolve(''); });
-    req.write(body);
-    req.end();
-  });
+  } catch {
+    return '';
+  }
 }
 
 // ── Gemini Helper (free tier — fallback to GPT-4o-mini if no key) ─────────────
@@ -450,6 +533,207 @@ function ensureDataDirs() {
   }
 }
 
+// Delete JSON artifacts older than 14 days. Keeps automation-os/data/ bounded.
+function cleanupOldArtifacts() {
+  const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - RETENTION_MS;
+  let deletedCount = 0;
+  const dirs = ['leads', 'content', 'campaigns', 'outreach', 'reports', 'review-queue'];
+  for (const dir of dirs) {
+    const dirPath = path.join(DATA_PATH, dir);
+    if (!fs.existsSync(dirPath)) continue;
+    try {
+      for (const file of fs.readdirSync(dirPath)) {
+        if (!file.endsWith('.json')) continue;
+        const filePath = path.join(dirPath, file);
+        try {
+          const stat = fs.statSync(filePath);
+          if (stat.mtimeMs < cutoff) {
+            fs.unlinkSync(filePath);
+            deletedCount++;
+          }
+        } catch { /* ignore single-file errors */ }
+      }
+    } catch { /* ignore directory errors */ }
+  }
+  if (deletedCount > 0) {
+    console.log(`[Gabriel] Cleaned up ${deletedCount} artifact(s) older than 14 days`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STEP 0 — API Health Preflight Check
+// Verifies all critical services are responding BEFORE committing to the run.
+// Any P1 failure (OpenAI, Supabase) aborts with a Telegram alert.
+// P2 failures (Firecrawl, Telegram) are logged but don't abort.
+// ═══════════════════════════════════════════════════════════════════════════════
+interface HealthCheckResult {
+  service: string;
+  status: 'ok' | 'fail' | 'skip' | 'warn';
+  latencyMs?: number;
+  message?: string;
+}
+
+async function step0_healthCheck(): Promise<{ allCriticalOk: boolean; results: HealthCheckResult[] }> {
+  console.log('\n[Step 0] API Health Preflight...');
+  const results: HealthCheckResult[] = [];
+
+  // ── OpenAI ────────────────────────────────────────────────────────────────
+  {
+    const start = Date.now();
+    try {
+      if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not set');
+      const res = await openai.models.list();
+      const ok = Array.isArray(res.data) && res.data.length > 0;
+      results.push({ service: 'OpenAI', status: ok ? 'ok' : 'fail', latencyMs: Date.now() - start });
+    } catch (e) {
+      results.push({ service: 'OpenAI', status: 'fail', latencyMs: Date.now() - start, message: String(e).slice(0, 150) });
+    }
+  }
+
+  // ── Supabase ──────────────────────────────────────────────────────────────
+  {
+    const start = Date.now();
+    try {
+      if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Supabase env vars missing');
+      const { error } = await supabase.from('gabriel_memory').select('id').limit(1);
+      results.push({
+        service: 'Supabase',
+        status: error ? 'fail' : 'ok',
+        latencyMs: Date.now() - start,
+        message: error?.message,
+      });
+    } catch (e) {
+      results.push({ service: 'Supabase', status: 'fail', latencyMs: Date.now() - start, message: String(e).slice(0, 150) });
+    }
+  }
+
+  // ── Firecrawl (P2 — lead scout degrades to Brave Search when credits depleted) ─
+  {
+    const start = Date.now();
+    if (!FIRECRAWL_API_KEY) {
+      results.push({ service: 'Firecrawl', status: 'skip', message: 'API key not set — using Brave Search for all lead scouting' });
+    } else {
+      try {
+        // Use a raw HTTPS check so we can inspect the status code directly
+        await new Promise<void>((resolve) => {
+          const body = JSON.stringify({ query: 'test', limit: 1 });
+          const req = https.request({
+            hostname: 'api.firecrawl.dev', path: '/v1/search', method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(body),
+            },
+          }, (res) => {
+            let d = ''; res.on('data', c => { d += c; }); res.on('end', () => {
+              const latencyMs = Date.now() - start;
+              try {
+                const parsed = JSON.parse(d);
+                if (res.statusCode === 402 || (parsed.error && String(parsed.error).toLowerCase().includes('credits'))) {
+                  firecrawlCreditsDepleted = true;
+                  results.push({
+                    service: 'Firecrawl',
+                    status: 'warn',
+                    latencyMs,
+                    message: '⚠️  Credits depleted — Brave Search will handle all lead scouting this run. Top up at firecrawl.dev/pricing',
+                  });
+                } else {
+                  results.push({ service: 'Firecrawl', status: 'ok', latencyMs });
+                }
+              } catch {
+                results.push({ service: 'Firecrawl', status: 'ok', latencyMs });
+              }
+              resolve();
+            });
+          });
+          req.on('error', () => {
+            results.push({ service: 'Firecrawl', status: 'fail', latencyMs: Date.now() - start, message: 'Network error' });
+            resolve();
+          });
+          req.setTimeout(10000, () => { req.destroy(); resolve(); });
+          req.write(body); req.end();
+        });
+      } catch (e) {
+        results.push({ service: 'Firecrawl', status: 'fail', latencyMs: Date.now() - start, message: String(e).slice(0, 150) });
+      }
+    }
+  }
+
+  // ── Telegram (P2 — run continues even if Telegram is down) ────────────────
+  {
+    const start = Date.now();
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+      results.push({ service: 'Telegram', status: 'skip', message: 'Bot token or chat ID not set' });
+    } else {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const req = https.request({
+            hostname: 'api.telegram.org',
+            path: `/bot${TELEGRAM_BOT_TOKEN}/getMe`,
+            method: 'GET',
+          }, (res) => {
+            let data = '';
+            res.on('data', c => { data += c; });
+            res.on('end', () => {
+              try {
+                const parsed = JSON.parse(data);
+                parsed.ok ? resolve() : reject(new Error(parsed.description));
+              } catch (e) { reject(e); }
+            });
+          });
+          req.on('error', reject);
+          req.setTimeout(8000, () => { req.destroy(); reject(new Error('Telegram timeout')); });
+          req.end();
+        });
+        results.push({ service: 'Telegram', status: 'ok', latencyMs: Date.now() - start });
+      } catch (e) {
+        results.push({ service: 'Telegram', status: 'fail', latencyMs: Date.now() - start, message: String(e).slice(0, 100) });
+      }
+    }
+  }
+
+  // ── AgentMail (P2 — optional) ─────────────────────────────────────────────
+  if (AGENTMAIL_API_KEY && AGENTMAIL_INBOX_ID) {
+    const start = Date.now();
+    try {
+      const messages = await fetchAgentMailUnread(AGENTMAIL_INBOX_ID);
+      results.push({ service: 'AgentMail', status: 'ok', latencyMs: Date.now() - start });
+    } catch (e) {
+      results.push({ service: 'AgentMail', status: 'fail', latencyMs: Date.now() - start, message: String(e).slice(0, 100) });
+    }
+  } else {
+    results.push({ service: 'AgentMail', status: 'skip', message: 'Not configured' });
+  }
+
+  // ── Print results ─────────────────────────────────────────────────────────
+  for (const r of results) {
+    const icon = r.status === 'ok' ? '✅' : r.status === 'skip' ? '⏭️ ' : r.status === 'warn' ? '⚠️ ' : '❌';
+    const latency = r.latencyMs !== undefined ? ` (${r.latencyMs}ms)` : '';
+    const msg = r.message ? ` — ${r.message}` : '';
+    console.log(`  ${icon} ${r.service}${latency}${msg}`);
+  }
+
+  // P1 services — any failure here aborts the run
+  const p1Services = ['OpenAI', 'Supabase'];
+  const p1Failures = results.filter(r => p1Services.includes(r.service) && r.status === 'fail');
+  const allCriticalOk = p1Failures.length === 0;
+
+  if (!allCriticalOk) {
+    const failMsg = p1Failures.map(r => `${r.service}: ${r.message ?? 'unreachable'}`).join(', ');
+    console.error(`  PREFLIGHT FAILED — aborting run: ${failMsg}`);
+    await sendTelegram(`🚨 GABRIEL ABORTED — ${TODAY}\nPreflight failed: ${failMsg}\nFix the issue and re-run manually.`).catch(() => {});
+  } else {
+    const p2Issues = results.filter(r => !p1Services.includes(r.service) && r.status === 'fail');
+    if (p2Issues.length > 0) {
+      console.log(`  ⚠️  Non-critical service issues: ${p2Issues.map(r => r.service).join(', ')} — run will continue with degraded features`);
+    }
+    console.log('  Preflight passed — starting main run');
+  }
+
+  return { allCriticalOk, results };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // STEP 1 — Load Config
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -507,6 +791,58 @@ async function step2_loadMemory(): Promise<{ pending_actions: unknown[]; carry_f
   }
 }
 
+// ── Email extraction from scraped markdown ────────────────────────────────────
+const EMAIL_REGEX = /\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/g;
+
+function extractEmailsFromText(text: string): string[] {
+  if (!text) return [];
+  const matches = text.match(EMAIL_REGEX) ?? [];
+  // Filter out common false-positives (image filenames, tracking IDs, etc.)
+  return [...new Set(matches)].filter(e =>
+    !e.includes('.png') && !e.includes('.jpg') && !e.includes('.gif') &&
+    !e.endsWith('.js') && !e.endsWith('.css') &&
+    !e.startsWith('noreply') && !e.startsWith('no-reply') &&
+    !e.includes('example.com') && !e.includes('sentry.io') &&
+    e.length < 80
+  );
+}
+
+// ── Firecrawl page scrape (single URL — for email discovery) ─────────────────
+async function callFirecrawlScrape(url: string): Promise<string> {
+  if (firecrawlCreditsDepleted) return '';
+  return new Promise((resolve) => {
+    const body = JSON.stringify({ url, formats: ['markdown'] });
+    const req = https.request({
+      hostname: 'api.firecrawl.dev',
+      path: '/v1/scrape',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => { data += c; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (res.statusCode === 402 || (parsed.error && String(parsed.error).toLowerCase().includes('credits'))) {
+            firecrawlCreditsDepleted = true;
+            resolve('');
+            return;
+          }
+          resolve(parsed.data?.markdown ?? parsed.markdown ?? '');
+        } catch { resolve(''); }
+      });
+    });
+    req.on('error', () => resolve(''));
+    req.setTimeout(15000, () => { req.destroy(); resolve(''); });
+    req.write(body);
+    req.end();
+  });
+}
+
 // ── Firecrawl Search Helper ───────────────────────────────────────────────────
 interface FirecrawlSearchResult {
   url: string;
@@ -515,7 +851,12 @@ interface FirecrawlSearchResult {
   markdown?: string;
 }
 
+// Tracks whether Firecrawl has hit its credit limit this run — if so, skip all future calls
+let firecrawlCreditsDepleted = false;
+
 async function callFirecrawlSearch(query: string, limit = 5): Promise<FirecrawlSearchResult[]> {
+  if (firecrawlCreditsDepleted) return [];
+
   return new Promise((resolve) => {
     const body = JSON.stringify({ query, limit, scrapeOptions: { formats: ['markdown'] } });
     const options = {
@@ -535,9 +876,17 @@ async function callFirecrawlSearch(query: string, limit = 5): Promise<FirecrawlS
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
+          if (res.statusCode === 402 || (parsed.error && String(parsed.error).toLowerCase().includes('credits'))) {
+            firecrawlCreditsDepleted = true;
+            console.log('  ⚠️  Firecrawl credits depleted (402) — switching to Brave Search for remaining queries');
+            console.log('     Upgrade at: https://firecrawl.dev/pricing');
+            resolve([]);
+            return;
+          }
           if (parsed.success && Array.isArray(parsed.data)) {
             resolve(parsed.data as FirecrawlSearchResult[]);
           } else {
+            if (parsed.error) console.log(`  ⚠️  Firecrawl error: ${String(parsed.error).slice(0, 120)}`);
             resolve([]);
           }
         } catch {
@@ -554,35 +903,63 @@ async function callFirecrawlSearch(query: string, limit = 5): Promise<FirecrawlS
 }
 
 // ── Brave Search fallback ────────────────────────────────────────────────────
-// Used when Firecrawl returns 0 results. Free tier = 2,000 queries/month.
+// Used when Firecrawl returns 0 results or credits are depleted.
+// Free tier = 2,000 queries/month.
+// NOTE: Do NOT send Accept-Encoding: gzip — Brave returns compressed bytes
+// that must be decompressed before JSON.parse. We handle it explicitly below.
 async function callBraveSearch(query: string, limit = 5): Promise<FirecrawlSearchResult[]> {
   if (!BRAVE_SEARCH_API_KEY) return [];
   return new Promise((resolve) => {
-    const params = new URLSearchParams({ q: query, count: String(limit) });
+    const params = new URLSearchParams({
+      q: query,
+      count: String(Math.min(limit, 20)),
+      search_lang: 'en',
+      country: 'us',
+    });
     const req = https.request({
       hostname: 'api.search.brave.com',
       path: `/res/v1/web/search?${params}`,
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
+        'Accept-Encoding': 'gzip',           // Brave always gzips — we decompress below
         'X-Subscription-Token': BRAVE_SEARCH_API_KEY,
       },
     }, (res) => {
       const chunks: Buffer[] = [];
-      res.on('data', (c) => chunks.push(c));
+      res.on('data', (c: Buffer) => chunks.push(c));
       res.on('end', () => {
-        try {
-          const raw = Buffer.concat(chunks).toString();
-          const parsed = JSON.parse(raw);
-          const results = (parsed?.web?.results ?? []).map((r: { url: string; title: string; description: string }) => ({
-            url: r.url,
-            title: r.title,
-            description: r.description,
-            markdown: '',
-          }));
-          resolve(results as FirecrawlSearchResult[]);
-        } catch { resolve([]); }
+        const raw = Buffer.concat(chunks);
+        const encoding = res.headers['content-encoding'];
+
+        const parseJson = (buf: Buffer) => {
+          try {
+            const parsed = JSON.parse(buf.toString('utf8'));
+            const results = (parsed?.web?.results ?? []).map((r: { url: string; title: string; description: string }) => ({
+              url: r.url,
+              title: r.title,
+              description: r.description,
+              markdown: '',
+            }));
+            resolve(results as FirecrawlSearchResult[]);
+          } catch {
+            resolve([]);
+          }
+        };
+
+        if (encoding === 'gzip') {
+          zlib.gunzip(raw, (err, decompressed) => {
+            if (err) { resolve([]); return; }
+            parseJson(decompressed);
+          });
+        } else if (encoding === 'deflate') {
+          zlib.inflate(raw, (err, decompressed) => {
+            if (err) { resolve([]); return; }
+            parseJson(decompressed);
+          });
+        } else {
+          parseJson(raw);
+        }
       });
     });
     req.on('error', () => resolve([]));
@@ -750,43 +1127,59 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
         continue;
       }
 
-      // Run first search query for this lane (rotate daily to avoid staleness)
-      const queryIndex = new Date().getDate() % queries.length;
-      const query = queries[queryIndex];
+      // ── Run ALL queries for this lane (not just one) — dedupe URLs afterwards ─
+      const allResults: FirecrawlSearchResult[] = [];
+      const seenUrls = new Set<string>();
 
-      console.log(`  ${lane}: searching "${query.slice(0, 60)}..."`);
-      let rawResults = await callFirecrawlSearch(query, config.lead_scout.max_leads_per_lane_per_run);
+      for (const query of queries) {
+        console.log(`  ${lane}: searching "${query.slice(0, 60)}..."`);
+        let qResults = await callFirecrawlSearch(query, config.lead_scout.max_leads_per_lane_per_run);
 
-      // Brave Search fallback if Firecrawl returns nothing
-      if (rawResults.length === 0 && BRAVE_SEARCH_API_KEY) {
-        console.log(`  ${lane}: Firecrawl empty — trying Brave Search fallback...`);
-        rawResults = await callBraveSearch(query, config.lead_scout.max_leads_per_lane_per_run);
-        if (rawResults.length > 0) console.log(`  ${lane}: Brave returned ${rawResults.length} results`);
+        // Brave Search fallback if Firecrawl returns nothing for this query
+        if (qResults.length === 0 && BRAVE_SEARCH_API_KEY) {
+          console.log(`  ${lane}: Firecrawl empty for query — trying Brave Search fallback...`);
+          qResults = await callBraveSearch(query, config.lead_scout.max_leads_per_lane_per_run);
+          if (qResults.length > 0) console.log(`  ${lane}: Brave returned ${qResults.length} results`);
+        }
+
+        for (const r of qResults) {
+          if (!seenUrls.has(r.url) && !isBlockedDomain(r.url)) {
+            seenUrls.add(r.url);
+            allResults.push(r);
+          }
+        }
+
+        // Small delay between queries to avoid rate-limiting
+        if (queries.indexOf(query) < queries.length - 1) {
+          await new Promise(r => setTimeout(r, 800));
+        }
       }
 
-      // Filter out freelance marketplaces and job boards
-      const results = rawResults.filter(r => !isBlockedDomain(r.url));
-      const blocked = rawResults.length - results.length;
-      if (blocked > 0) console.log(`  ${lane}: filtered ${blocked} freelance/job-board result(s)`);
+      const blockedCount = queries.reduce((acc, q, i) => acc, 0); // already filtered above
+      console.log(`  ${lane}: ${allResults.length} unique URLs gathered across ${queries.length} queries`);
 
-      if (results.length === 0) {
-        console.log(`  ${lane}: no results from Firecrawl or Brave — skipping lane`);
-        SKIPPED_LANES.push({ lane, reason: 'No results from Firecrawl or Brave Search', query });
+      if (allResults.length === 0) {
+        console.log(`  ${lane}: no results from any search source — skipping lane`);
+        SKIPPED_LANES.push({ lane, reason: 'No results from Firecrawl or Brave Search (all queries)' });
         continue;
       }
 
       // Feed real scraped context to GPT for structured lead extraction
-      const scrapedContext = results
-        .slice(0, 5)
+      // Use up to 8 results for richer context (more queries = more signal)
+      const scrapedContext = allResults
+        .slice(0, 8)
         .map((r, i) => `[${i + 1}] ${r.title || 'Unknown'} — ${r.url}\n${r.description || ''}\n${(r.markdown || '').slice(0, 400)}`)
         .join('\n\n---\n\n');
 
       // ── CALL A: Extract lead profiles (no scoring — extraction only) ─────────
+      // EMAIL EXTRACTION: ask GPT to pull any email visible in the scraped content,
+      // and also record source_url so we can scrape it for contact emails.
       const extractPrompt = `You are Lead Scout for Alfred Colvin's business "${lane}" in Indianapolis.
 Extract real prospect profiles from the web research below. ONLY use companies and people mentioned in the source material.
 Do NOT invent names. If a real person's name is not mentioned, leave name as null.
+If an email address is visible in the content, include it in the email field. Otherwise leave email as null.
 Do NOT assign quality scores — that is a separate step.
-Return JSON array. Each item: { name (string|null), company, title (string|null), linkedin_url (string|null), fit_reason, source_url }.
+Return JSON array. Each item: { name (string|null), company, title (string|null), linkedin_url (string|null), email (string|null), fit_reason, source_url }.
 Max ${config.lead_scout.max_leads_per_lane_per_run} prospects.`;
 
       const extractResponse = await callGPT(
@@ -800,15 +1193,50 @@ Max ${config.lead_scout.max_leads_per_lane_per_run} prospects.`;
         extractedRaw = JSON.parse(extractResponse.replace(/```json|```/g, '').trim());
       } catch {
         console.log(`  ${lane}: JSON parse error on lead extraction — skipping lane`);
-        SKIPPED_LANES.push({ lane, reason: 'JSON parse error on lead extraction', query });
+        SKIPPED_LANES.push({ lane, reason: 'JSON parse error on lead extraction' });
         continue;
       }
-      const extracted: Array<{name:string|null;company:string;title:string|null;linkedin_url:string|null;fit_reason:string;source_url:string}> =
-        Array.isArray(extractedRaw) ? extractedRaw : [];
+      const extracted: Array<{
+        name: string|null; company: string; title: string|null;
+        linkedin_url: string|null; email: string|null;
+        fit_reason: string; source_url: string;
+      }> = Array.isArray(extractedRaw) ? extractedRaw : [];
 
       if (extracted.length === 0) {
         console.log(`  ${lane}: 0 prospects extracted from Firecrawl content`);
         continue;
+      }
+
+      // ── EMAIL DISCOVERY: scrape source URLs to find contact emails ──────────
+      // For leads without an email, attempt to scrape their source page for
+      // email addresses using regex. Limit to 3 scrapes per lane to conserve quota.
+      let emailsDiscovered = 0;
+      const scrapeLimit = 3;
+      let scrapeCount = 0;
+
+      for (const lead of extracted) {
+        if (lead.email) continue; // already has one
+        if (scrapeCount >= scrapeLimit) break;
+        if (!lead.source_url || lead.source_url.startsWith('http') === false) continue;
+
+        try {
+          scrapeCount++;
+          const pageMarkdown = await callFirecrawlScrape(lead.source_url);
+          const foundEmails = extractEmailsFromText(pageMarkdown);
+          if (foundEmails.length > 0) {
+            lead.email = foundEmails[0]; // first match is usually the primary contact
+            emailsDiscovered++;
+            console.log(`  ${lane}: email found for ${lead.company} via page scrape: ${lead.email}`);
+          }
+        } catch {
+          // Non-fatal — skip this scrape
+        }
+        // Brief pause between scrapes
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      if (emailsDiscovered > 0) {
+        console.log(`  ${lane}: ${emailsDiscovered} email(s) discovered via page scraping`);
       }
 
       // ── CALL B: Independent scoring (separate call — no conflict of interest) ─
@@ -832,7 +1260,7 @@ A government agency or nonprofit is a partner/referral_source, not a direct clie
 
 Scoring rubric:
 - source_credibility (1-10): Is the source URL a real specific organization? Not a generic directory.
-- contact_specificity (1-10): Named person with real role = 8+. Title-only = 5. No contact = 3.
+- contact_specificity (1-10): Named person with real role = 8+. Has email = +1 bonus. Title-only = 5. No contact = 3.
 - decision_maker_fit (1-10): Does the role have authority to hire/buy Alfred's offer?
 - geography_match (1-10): Indianapolis/Indiana = 10. Adjacent = 6. Out of region = 2.
 - offer_alignment (1-10): How specifically does this prospect match Alfred's ${lane} offer?
@@ -849,7 +1277,7 @@ Return JSON array matching the input order: [{ source_credibility, contact_speci
       const scoreResponse = await callGPT(
         config.model_routing.lead_scoring,
         scorePrompt,
-        `Score these ${extracted.length} prospects:\n${extracted.map((p, i) => `${i+1}. ${p.name ?? '[no name]'}, ${p.title ?? '[no title]'} at ${p.company} — ${p.fit_reason}`).join('\n')}`
+        `Score these ${extracted.length} prospects:\n${extracted.map((p, i) => `${i+1}. ${p.name ?? '[no name]'}, ${p.title ?? '[no title]'} at ${p.company}${p.email ? ' [has email]' : ''} — ${p.fit_reason}`).join('\n')}`
       );
 
       let scoresRaw: unknown;
@@ -870,6 +1298,7 @@ Return JSON array matching the input order: [{ source_credibility, contact_speci
             company: l.company,
             title: l.title,
             linkedin_url: l.linkedin_url,
+            email: l.email ?? undefined,
             lane,
             fit_reason: l.fit_reason,
             qualification_score: Math.round((s.final_score ?? 5) * 10) / 10,
@@ -883,15 +1312,16 @@ Return JSON array matching the input order: [{ source_credibility, contact_speci
       const avgScore = taggedLeads.length > 0
         ? (taggedLeads.reduce((sum, l) => sum + l.qualification_score, 0) / taggedLeads.length).toFixed(1)
         : '—';
+      const withEmail = taggedLeads.filter(l => l.email).length;
 
       leads.push(...taggedLeads);
-      console.log(`  ${lane}: ${taggedLeads.length}/${extracted.length} leads passed independent scoring (avg: ${avgScore}/10)`);
+      console.log(`  ${lane}: ${taggedLeads.length}/${extracted.length} leads passed scoring (avg: ${avgScore}/10) — ${withEmail} with email`);
     } catch (err) {
-      console.log(`  ${lane}: lead scout failed — ${String(err).slice(0, 80)}`);
+      console.log(`  ${lane}: lead scout failed — ${String(err).slice(0, 300)}`);
     }
   }
 
-  console.log(`  Total real leads found: ${leads.length}`);
+  console.log(`  Total real leads found: ${leads.length} (${leads.filter(l => l.email).length} with email)`);
   if (leads.length > 0) {
     const sources = [...new Set(leads.map(l => l.source))];
     console.log(`  Sources: ${sources.slice(0, 3).join(', ')}${sources.length > 3 ? ` +${sources.length - 3} more` : ''}`);
@@ -958,7 +1388,7 @@ Return JSON: { draft: string, compliance_flags: string[] }`;
           status: 'pending_review',
         });
       } catch (err) {
-        console.log(`  Follow-up draft failed for ${lead.company}: ${String(err).slice(0, 60)}`);
+        console.log(`  Follow-up draft failed for ${lead.company}: ${String(err).slice(0, 300)}`);
       }
     }
 
@@ -1097,7 +1527,7 @@ Lead context: ${matchedLead ? `${matchedLead.title || 'Contact'} at ${matchedLea
     }
 
   } catch (err) {
-    console.log(`  AgentMail reply check failed: ${String(err).slice(0, 80)}`);
+    console.log(`  AgentMail reply check failed: ${String(err).slice(0, 300)}`);
   }
 
   return repliesProcessed;
@@ -1117,7 +1547,12 @@ async function step4_outreachPrep(leads: Lead[], config: GabrielConfig): Promise
     try {
       const isKatrinaLane = config.compliance.katrina_gate_lanes.includes(lead.lane);
       const isRealLead = lead.source && lead.source.startsWith('firecrawl_web');
-      const systemPrompt = `You are the Outreach Agent for Alfred Colvin. Write a LinkedIn connection request (max 300 chars) for this lead.
+      const laneStrategy = config.lane_strategy?.[lead.lane];
+      const cta = laneStrategy?.cta ?? laneStrategy?.cta_buyers ?? laneStrategy?.cta_testers ?? 'Learn more';
+      const ctaLink = laneStrategy?.cta_link ?? '';
+
+      // ── LinkedIn connection request ──────────────────────────────────────
+      const linkedinSystem = `You are the Outreach Agent for Alfred Colvin. Write a LinkedIn connection request (max 300 chars) for this lead.
 Alfred is an AI automation consultant and entrepreneur in Indianapolis. His voice: professional, warm, direct, faith-rooted.
 FORBIDDEN openers: "I came across", "I admire", "I love what you're doing", "I noticed", "I hope this finds you".
 Instead: lead with a specific observation about their industry, a shared Indianapolis context, or a direct value statement.
@@ -1125,21 +1560,21 @@ ${isRealLead ? 'This is a real company found via web research. Reference their a
 NO pitch in the connection request. One sentence max.
 Return JSON: { draft: string, compliance_flags: string[] }`;
 
-      const response = await callGPT(
+      const linkedinResponse = await callGPT(
         config.model_routing.outreach_drafts,
-        systemPrompt,
-        `Lead: ${lead.name}, ${lead.title} at ${lead.company}. Lane: ${lead.lane}. Why they fit: ${lead.fit_reason}`
+        linkedinSystem,
+        `Lead: ${lead.name ?? '[Contact]'}, ${lead.title ?? 'unknown role'} at ${lead.company}. Lane: ${lead.lane}. Why they fit: ${lead.fit_reason}`
       );
 
-      const parsed = JSON.parse(response.replace(/```json|```/g, '').trim());
-      const draftText = parsed.draft ?? '';
+      const linkedinParsed = JSON.parse(linkedinResponse.replace(/```json|```/g, '').trim());
+      const linkedinDraft = linkedinParsed.draft ?? '';
 
       // Scan for spam trigger words — flag but don't block (Alfred decides)
-      const spamFlags = scanForSpamWords(draftText);
-      const allFlags = [...(parsed.compliance_flags ?? []), ...spamFlags];
+      const spamFlags = scanForSpamWords(linkedinDraft);
+      const allLinkedInFlags = [...(linkedinParsed.compliance_flags ?? []), ...spamFlags];
 
       if (spamFlags.length > 0) {
-        console.log(`  ⚠️  Spam risk flags in draft for ${lead.company}: ${spamFlags.join(', ')}`);
+        console.log(`  ⚠️  Spam risk flags in LinkedIn draft for ${lead.company}: ${spamFlags.join(', ')}`);
       }
 
       drafts.push({
@@ -1147,18 +1582,74 @@ Return JSON: { draft: string, compliance_flags: string[] }`;
         lead_company: lead.company,
         lane: lead.lane,
         message_type: 'linkedin_connection',
-        draft: draftText,
+        draft: linkedinDraft,
         priority_score: lead.qualification_score,
-        compliance_flags: allFlags,
+        compliance_flags: allLinkedInFlags,
         katrina_review_required: isKatrinaLane,
         status: 'pending_review',
       });
+
+      // ── Email outreach draft (only when email was discovered) ──────────────
+      // Email leads get a separate cold email draft. Never auto-sent — Alfred approves.
+      if (lead.email) {
+        try {
+          const emailSystem = `You are the Outreach Agent for Alfred Colvin. Write a cold outreach email (max ${config.outreach.email_max_words ?? 300} words) for this lead.
+Alfred is an AI automation consultant and entrepreneur in Indianapolis. His voice: direct, warm, faith-rooted. Never corporate. Never generic.
+
+EMAIL STRUCTURE (follow exactly):
+1. Subject line: under 8 words, no clickbait, no exclamation marks. Specific to their industry.
+2. Opening line: NOT "I hope this finds you well" or "My name is..." — start with a specific observation about their business or industry pain.
+3. Body (2–3 short paragraphs): Name the problem relevant to their role → hint at the solution → reference Alfred's relevant lane offer. No walls of text.
+4. CTA: one soft ask only — link to a resource OR book a call. Use: "${cta}"${ctaLink ? ` — ${ctaLink}` : ''}
+5. Sign-off: Alfred Colvin | ${lead.lane === 'colvin_enterprises' ? 'Colvin Enterprises' : lead.lane === 'first_keys_indy' ? 'First Keys Indy' : lead.lane === 'music_theory_secrets' ? 'Music Theory Secrets' : 'Alfred Colvin'} | Indianapolis, IN
+
+RULES: No fake case studies. No "I was browsing LinkedIn". No "I loved your post". No guaranteed results.
+Return JSON: { subject: string, draft: string, compliance_flags: string[] }`;
+
+          const emailResponse = await callGPT(
+            config.model_routing.outreach_drafts,
+            emailSystem,
+            `Lead: ${lead.name ?? '[Contact]'}, ${lead.title ?? 'unknown role'} at ${lead.company}. Email: ${lead.email}. Lane: ${lead.lane}. Why they fit: ${lead.fit_reason}`,
+            { taskType: 'outreach_drafts', lane: lead.lane }
+          );
+
+          const emailParsed = JSON.parse(emailResponse.replace(/```json|```/g, '').trim());
+          const emailBody = emailParsed.draft ?? '';
+          const emailSubject = emailParsed.subject ?? `Quick note — ${lead.company}`;
+
+          const emailSpamFlags = scanForSpamWords(emailBody + ' ' + emailSubject);
+          const allEmailFlags = [...(emailParsed.compliance_flags ?? []), ...emailSpamFlags];
+
+          if (emailSpamFlags.length > 0) {
+            console.log(`  ⚠️  Spam risk in email draft for ${lead.company}: ${emailSpamFlags.join(', ')}`);
+          }
+
+          drafts.push({
+            lead_name: lead.name ?? '[Contact]',
+            lead_company: lead.company,
+            lane: lead.lane,
+            message_type: 'email',
+            draft: `SUBJECT: ${emailSubject}\n\nTO: ${lead.email}\n\n${emailBody}`,
+            priority_score: lead.qualification_score,
+            compliance_flags: allEmailFlags,
+            katrina_review_required: isKatrinaLane,
+            status: 'pending_review',
+          });
+
+          console.log(`  ✓ Email draft created for ${lead.company} (${lead.email})`);
+        } catch (emailErr) {
+          console.log(`  Email draft failed for ${lead.company}: ${String(emailErr).slice(0, 300)}`);
+        }
+      }
+
     } catch (err) {
-      console.log(`  Draft failed for ${lead.name}: ${String(err).slice(0, 60)}`);
+      console.log(`  Draft failed for ${lead.name ?? lead.company}: ${String(err).slice(0, 300)}`);
     }
   }
 
-  console.log(`  Outreach drafts created: ${drafts.length} (awaiting Alfred's approval)`);
+  const linkedinCount = drafts.filter(d => d.message_type === 'linkedin_connection').length;
+  const emailCount = drafts.filter(d => d.message_type === 'email').length;
+  console.log(`  Outreach drafts created: ${drafts.length} total (${linkedinCount} LinkedIn, ${emailCount} email) — awaiting Alfred's approval`);
   return drafts;
 }
 
@@ -1274,8 +1765,14 @@ Return JSON: { draft: string, character_count: number }`;
         `Write the Hook-Story-Offer LinkedIn post for ${targetLane} (${TODAY}). Indianapolis context. No fabricated proof.`
       );
 
-      const liParsed = JSON.parse(linkedinResponse.replace(/```json|```/g, '').trim());
-      let liDraft = liParsed.draft ?? '';
+      let liDraft = '';
+      try {
+        const liParsed = JSON.parse(linkedinResponse.replace(/```json|```/g, '').trim());
+        liDraft = liParsed.draft ?? '';
+      } catch {
+        console.log(`  ✗ ${targetLane}: LinkedIn GPT response was not valid JSON — skipping lane`);
+        continue;
+      }
 
       // Evidence scanner — retry once with stricter prompt if flagged
       const liFlags = scanForHallucinations(liDraft);
@@ -1286,7 +1783,13 @@ Return JSON: { draft: string, character_count: number }`;
           linkedinSystem + '\nFINAL RULE: Zero specific clients, zero fabricated results, zero unverifiable numbers. Label any outcome as [example scenario].',
           `Rewrite for ${targetLane}. No invented proof. Keep the hook verbatim.`
         ).catch(() => '{}');
-        const retryDraft = JSON.parse(retry.replace(/```json|```/g, '').trim()).draft ?? '';
+        let retryDraft = '';
+        try {
+          retryDraft = JSON.parse(retry.replace(/```json|```/g, '').trim()).draft ?? '';
+        } catch {
+          console.log(`  ✗ ${targetLane}: LinkedIn retry response was not valid JSON — skipping lane`);
+          continue;
+        }
         if (scanForHallucinations(retryDraft).length > 0) {
           console.log(`  ✗ ${targetLane}: evidence scanner failed twice — skipping lane`);
           continue;
@@ -1334,81 +1837,126 @@ Return JSON: { draft: string }`;
       // ── Short-form video (TikTok / Facebook Reels) — generates VideoScript JSON for Remotion ───
       if (wantsTikTok) try {
         const videoId = `${targetLane}-${TODAY}-${RUN_TIMESTAMP}`;
-        const videoSystem = `You are Genius, Alfred Colvin's content strategist. Generate a structured VideoScript JSON for a 45–60 second TikTok/Facebook Reel using the Hook-Story-Offer framework.
+        // ── CINEMATIC 6-SCENE STRUCTURE (LOCKED UPGRADE 010) ─────────────────
+        // Uses the new scene types: hook → pain_stack → desire → mechanism → transformation → cta
+        // Each scene type maps to a dedicated cinematic Remotion component with
+        // Ken Burns motion, DALL-E 3 images, KineticHeadline, LightSweep, color grading.
+        // DO NOT revert to old 5-scene structure. See LOCKED_UPGRADES.md #010.
 
-Brand voice: direct, warm, faith-rooted. Indianapolis. Real person — not a marketer.
+        const PHOTO_DIRECTION = targetLane === 'first_keys_indy' ? `
+PROBLEM scenes (hook, pain_stack): "Cinematic portrait of a Black woman in her 30s, exhausted and worried, sitting in a dim Indianapolis apartment — cold blue side light, raw emotional documentary photography, photorealistic. ALL photos must feature Black people."
+SOLUTION scenes (desire, mechanism, transformation, cta): "Cinematic portrait of a joyful Black family holding house keys outside their first home, tears of joy, warm golden hour sunlight, shallow depth of field, photorealistic. ALL photos must feature Black people."
+COMPLIANCE: never say 'guaranteed', 'free money', or imply guaranteed approval.`
+        : targetLane === 'colvin_enterprises' ? `
+PROBLEM scenes (hook, pain_stack): "Cinematic close-up of a Black businessman, exhausted, head in hands at a cluttered desk, dark late-night office, harsh blue monitor glow, deep moody shadows, photorealistic"
+SOLUTION scenes (desire, mechanism, transformation, cta): "Cinematic portrait of a confident Black entrepreneur, relaxed genuine smile, bright modern Indianapolis office, warm golden morning sunlight, clean desk, sense of peace and mastery, photorealistic"`
+        : targetLane === 'music_theory_secrets' ? `
+PROBLEM scenes (hook, pain_stack): "Cinematic close-up of a Black musician at a church piano, staring at sheet music with frustrated confused expression, dramatic directional side light through stained glass, photorealistic"
+SOLUTION scenes (desire, mechanism, transformation, cta): "Cinematic portrait of a Black gospel pianist, eyes closed in pure joy, playing keyboard on a warm glowing church stage, warm amber stage lights, expression of deep confidence, photorealistic"`
+        : `PROBLEM scenes: overwhelmed person, cold dramatic light. SOLUTION scenes: confident relaxed person, warm golden light.`
+
+        const videoSystem = `You are Genius, Alfred Colvin's cinematic ad strategist. Generate a CINEMATIC 6-scene VideoScript JSON for a 31-second TikTok/Facebook Reel.
+
+Brand voice: direct, warm, faith-rooted, Indianapolis. Real human — not a marketer.
 Lane: ${targetLane}
 Transformation: "${transformation}"
 Rung: ${rungLabel} — ${focusNote}
-Hook (use verbatim in first scene): "${hook ?? 'Most people have this wrong.'}"
+Hook (use verbatim): "${hook ?? 'Most people have this wrong.'}"
 CTA: "${cta}"
-NO fabricated testimonials. NO invented numbers. Label anything hypothetical as (example).
 
-Return ONLY valid JSON matching this exact shape:
+PHOTO DIRECTION — write cinematic DALL-E 3 descriptions for assets[]:
+${PHOTO_DIRECTION}
+
+NO fabricated testimonials. NO invented statistics. Label anything hypothetical as (example).
+
+Return ONLY valid JSON:
 {
   "title": "short internal title",
   "audience": "who this is for",
   "goal": "what this video makes them do",
-  "voiceover_script": "full spoken script 45-60 seconds",
   "caption_hook": "first line of social caption — under 10 words, no emoji",
   "caption": "full TikTok/Facebook caption — 150 chars max",
   "hashtags": ["tag1","tag2","tag3"],
-  "music_direction": "music mood e.g. 'lo-fi hip hop' or 'ambient gospel piano'",
+  "music_direction": "${targetLane === 'music_theory_secrets' ? 'Soulful gospel-influenced cinematic piano — restrained tension building to warm triumph' : targetLane === 'first_keys_indy' ? 'Emotional cinematic piano with subtle strings — quiet hope building to tearful triumph' : 'Confident cinematic hip-hop instrumental — dark tension building to golden crescendo'}",
+  "voiceover_voice": "${targetLane === 'first_keys_indy' ? 'nova' : targetLane === 'music_theory_secrets' ? 'fable' : 'echo'}",
   "thumbnail_concept": "1-sentence visual description for thumbnail",
   "scenes": [
     {
       "id": "scene-1",
       "type": "hook",
-      "duration_seconds": 3,
+      "duration_seconds": 4,
       "headline": "${hook ?? 'Most people have this wrong.'}",
-      "caption_text": "3-5 word on-screen text",
-      "motion": "zoom_in",
-      "transition": "cut",
-      "voiceover": "spoken hook line",
-      "assets": [{ "type": "image", "description": "Describe a real person relevant to this lane and scene — e.g. 'Black woman looking confident and determined, portrait'", "fallback_color": null }]
+      "emphasis": "2-3 word phrase to highlight in accent color",
+      "caption_text": "caption that reads as narration for this scene",
+      "motion_direction": "push_in",
+      "color_grade": "cold",
+      "overlay_intensity": "heavy",
+      "assets": [{ "type": "background", "description": "PROBLEM photo direction above — be specific and cinematic" }]
     },
     {
       "id": "scene-2",
-      "type": "problem",
-      "duration_seconds": 8,
-      "headline": "The core problem in under 8 words",
-      "body": "1-2 sentences of context",
-      "motion": "slide_up",
-      "transition": "fade",
-      "voiceover": "spoken story paragraph 1"
+      "type": "pain_stack",
+      "duration_seconds": 5,
+      "headline": "Short emotional hook line",
+      "pain_points": ["Pain point 1 — under 7 words", "Pain point 2 — under 7 words", "Pain point 3 — under 7 words"],
+      "caption_text": "caption narration for pain scene",
+      "motion_direction": "push_in",
+      "color_grade": "cold",
+      "assets": [{ "type": "background", "description": "PROBLEM photo direction above" }]
     },
     {
       "id": "scene-3",
-      "type": "solution",
-      "duration_seconds": 10,
-      "headline": "The reframe or truth",
-      "body": "The shift. What they need to know.",
-      "motion": "slide_up",
-      "transition": "fade",
-      "voiceover": "spoken story paragraph 2"
+      "type": "desire",
+      "duration_seconds": 5,
+      "headline": "Aspirational headline — paint the picture",
+      "emphasis": "key phrase in accent color",
+      "body": "One-line description of the dream outcome",
+      "caption_text": "caption narration for desire scene",
+      "motion_direction": "pull_back",
+      "color_grade": "warm",
+      "assets": [{ "type": "background", "description": "SOLUTION photo direction above" }]
     },
     {
       "id": "scene-4",
-      "type": "proof",
-      "duration_seconds": 8,
-      "headline": "The result or example",
-      "body": "(example) one outcome that proves the point",
-      "stat": "optional key number or null",
-      "stat_label": "label for the stat or null",
-      "motion": "fade",
-      "transition": "fade",
-      "voiceover": "spoken proof paragraph",
-      "assets": [{ "type": "image", "description": "Describe a real person showing the positive outcome — e.g. 'Black couple smiling holding house keys outside new home'", "fallback_color": null }]
+      "type": "mechanism",
+      "duration_seconds": 6,
+      "headline": "How it works headline",
+      "emphasis": "key phrase",
+      "steps": [
+        { "number": "1", "title": "Step 1 name", "description": "brief description" },
+        { "number": "2", "title": "Step 2 name", "description": "brief description" },
+        { "number": "3", "title": "Step 3 name", "description": "brief description" }
+      ],
+      "caption_text": "caption narration for mechanism scene",
+      "motion_direction": "drift_right",
+      "color_grade": "warm",
+      "assets": [{ "type": "background", "description": "SOLUTION photo direction above — professional/purposeful setting" }]
     },
     {
       "id": "scene-5",
+      "type": "transformation",
+      "duration_seconds": 5,
+      "headline": "The change headline",
+      "emphasis": "key word",
+      "before_state": "Before state — under 8 words",
+      "after_state": "After state — under 8 words",
+      "caption_text": "caption narration for transformation scene",
+      "motion_direction": "pull_back",
+      "color_grade": "warm",
+      "assets": [{ "type": "background", "description": "SOLUTION photo direction above — triumphant, emotional" }]
+    },
+    {
+      "id": "scene-6",
       "type": "cta",
       "duration_seconds": 6,
-      "headline": "One-line CTA",
+      "headline": "Urgent CTA headline",
+      "emphasis": "key phrase",
       "cta_text": "${cta}",
-      "motion": "slide_up",
-      "transition": "fade",
-      "voiceover": "spoken CTA"
+      "cta_url": "${targetLane === 'first_keys_indy' ? 'https://firstkeysindy.com' : targetLane === 'music_theory_secrets' ? 'https://musictheorysecrets.com' : 'https://calendar.app.google/igj4Vfwvc1ZUB3Gc9'}",
+      "caption_text": "caption narration for CTA scene — include link in bio",
+      "motion_direction": "pull_back",
+      "color_grade": "warm",
+      "assets": [{ "type": "background", "description": "SOLUTION photo direction above — celebratory, triumphant" }]
     }
   ],
   "claims_check": {
@@ -1493,7 +2041,7 @@ Return ONLY valid JSON matching this exact shape:
             video_script_id: videoId,
           } as ContentDraft & { katrina_review_required?: boolean; video_script_id?: string });
         }
-      } catch (e) { console.log(`  ${targetLane} video script error: ${String(e).slice(0,80)}`); }
+      } catch (e) { console.log(`  ${targetLane} video script error: ${String(e).slice(0, 300)}`); }
 
       // ── Slide carousel (LinkedIn / Instagram — 5 slides) ─────────────────
       if (wantsLinkedIn) try {
@@ -1552,7 +2100,7 @@ Return JSON: {
       console.log(`  ${targetLane}: ✓ ${generatedPlatforms} (Hook: "${(hook ?? '').slice(0, 40)}...")`);
 
     } catch (err) {
-      console.log(`  ${targetLane}: content gen failed — ${String(err).slice(0, 80)}`);
+      console.log(`  ${targetLane}: content gen failed — ${String(err).slice(0, 300)}`);
     }
   }
 
@@ -1603,7 +2151,7 @@ async function step6_solomonSEO(config: GabrielConfig): Promise<SolomonSEOReport
       ).join('\n\n---\n\n');
 
       const solomonAnalysis = await callGPT(
-        'gpt-4o',
+        'gpt-4o-mini',
         `You are Solomon, Alfred Colvin's SEO intelligence specialist based in Indianapolis, Indiana.
 Analyze real SERP data and give evidence-based recommendations ONLY.
 Never invent keywords or data. Only use what you see in the search results provided.
@@ -1657,7 +2205,7 @@ Return JSON only (no markdown):
       console.log(`  [Solomon] ${lane}: ${report.opportunities.length} opportunities | sources: ${report.evidence_urls.length}`);
 
     } catch (err) {
-      console.log(`  [Solomon] ${lane} failed: ${String(err).slice(0, 80)}`);
+      console.log(`  [Solomon] ${lane} failed: ${String(err).slice(0, 300)}`);
     }
   }
 
@@ -1687,7 +2235,7 @@ async function step7_geniusMarketing(
       : 'No SEO data available — make recommendations based on lane context only.';
 
     const response = await callGPT(
-      'gpt-4o',
+      'gpt-4o-mini',
       `You are Genius, Alfred Colvin's marketing and conversion specialist in Indianapolis, Indiana.
 You give specific, doable, low-cost marketing actions. Never vague. Never guaranteed results.
 Never suggest mass outreach or auto-posting. Alfred approves everything before it goes out.
@@ -1714,7 +2262,7 @@ Return JSON array only: ["Action 1: ...", "Action 2: ...", "Action 3: ..."]`,
       recs.push(...lines);
     }
   } catch (err) {
-    console.log(`  Genius marketing failed: ${String(err).slice(0, 80)}`);
+    console.log(`  Genius marketing failed: ${String(err).slice(0, 300)}`);
   }
 
   console.log(`  Genius recommendations: ${recs.length}`);
@@ -1875,34 +2423,82 @@ async function step12_saveOutputs(
   fs.writeFileSync(contentPath, JSON.stringify(contentDrafts, null, 2));
 
   // Save leads to Supabase CRM
+  // SPLIT STRATEGY: PostgreSQL unique constraints treat NULL != NULL, so upsert
+  // onConflict:'linkedin_url' silently duplicates every org/referral lead that
+  // has no LinkedIn URL. We split into two paths:
+  //   1. Person leads (have linkedin_url) → upsert on linkedin_url
+  //   2. Org leads (no linkedin_url)      → dedup by company+lane before inserting
   try {
-    const leadsToInsert = leads
-      .filter(l => l.qualification_score >= 5)
-      .map(l => ({
-        name: l.name ?? null,
-        company: l.company ?? '[Unknown]',
-        title: l.title ?? null,
-        linkedin_url: l.linkedin_url ?? null,
-        lane: l.lane,
-        fit_reason: l.fit_reason,
-        qualification_score: toDbScore(l.qualification_score),
-        source: l.source,
-        lead_type: (!l.name && l.company) ? 'organization' : 'person',
-        status: 'new',
-        created_at: l.found_at ?? new Date().toISOString(),
-      }));
+    const qualifiedLeads = leads.filter(l => l.qualification_score >= 5);
 
-    if (leadsToInsert.length > 0) {
-      const { error: leadsError } = await supabase.from('leads')
-        .upsert(leadsToInsert, {
-          onConflict: 'linkedin_url',
-          ignoreDuplicates: true,
-        });
-      if (leadsError) console.log(`  Supabase leads CRM warning: ${leadsError.message}`);
-      else console.log(`  Saved ${leadsToInsert.length} leads to Supabase CRM`);
+    const personLeads = qualifiedLeads.filter(l => l.linkedin_url).map(l => ({
+      name: l.name ?? null,
+      company: l.company ?? '[Unknown]',
+      title: l.title ?? null,
+      linkedin_url: l.linkedin_url!,
+      email: l.email ?? null,
+      lane: l.lane,
+      fit_reason: l.fit_reason,
+      qualification_score: toDbScore(l.qualification_score),
+      source: l.source,
+      lead_type: 'person',
+      status: 'new',
+      created_at: l.found_at ?? new Date().toISOString(),
+    }));
+
+    const orgLeads = qualifiedLeads.filter(l => !l.linkedin_url).map(l => ({
+      name: l.name ?? null,
+      company: l.company ?? '[Unknown]',
+      title: l.title ?? null,
+      linkedin_url: null,
+      email: l.email ?? null,
+      lane: l.lane,
+      fit_reason: l.fit_reason,
+      qualification_score: toDbScore(l.qualification_score),
+      source: l.source,
+      lead_type: l.lead_type ?? 'organization',
+      status: 'new',
+      created_at: l.found_at ?? new Date().toISOString(),
+    }));
+
+    let savedCount = 0;
+
+    // Path 1: Person leads — upsert on linkedin_url (safe, no NULL collision)
+    if (personLeads.length > 0) {
+      const { error: personError } = await supabase.from('leads')
+        .upsert(personLeads, { onConflict: 'linkedin_url', ignoreDuplicates: true });
+      if (personError) console.log(`  Supabase person leads warning: ${personError.message}`);
+      else savedCount += personLeads.length;
     }
+
+    // Path 2: Org leads — check company+lane existence first, then insert only new ones
+    if (orgLeads.length > 0) {
+      const companyNames = [...new Set(orgLeads.map(l => l.company))];
+      const { data: existingOrgs } = await supabase.from('leads')
+        .select('company, lane')
+        .in('company', companyNames)
+        .is('linkedin_url', null);
+
+      const existingKeys = new Set(
+        (existingOrgs ?? []).map(r => `${r.company}::${r.lane}`)
+      );
+
+      const newOrgLeads = orgLeads.filter(
+        l => !existingKeys.has(`${l.company}::${l.lane}`)
+      );
+
+      if (newOrgLeads.length > 0) {
+        const { error: orgError } = await supabase.from('leads').insert(newOrgLeads);
+        if (orgError) console.log(`  Supabase org leads warning: ${orgError.message}`);
+        else savedCount += newOrgLeads.length;
+      }
+      const orgSkipped = orgLeads.length - (newOrgLeads?.length ?? 0);
+      if (orgSkipped > 0) console.log(`  Supabase: skipped ${orgSkipped} already-known org lead(s)`);
+    }
+
+    if (savedCount > 0) console.log(`  Saved ${savedCount} leads to Supabase CRM (${personLeads.length} person, ${orgLeads.length} org)`);
   } catch (err) {
-    console.log(`  Supabase leads save skipped: ${String(err).slice(0, 80)}`);
+    console.log(`  Supabase leads save skipped: ${String(err).slice(0, 300)}`);
   }
 
   // Save outreach drafts to Supabase (idempotent — skip if this run already saved)
@@ -1938,7 +2534,7 @@ async function step12_saveOutputs(
       }
     }
   } catch (err) {
-    console.log(`  Supabase outreach save skipped: ${String(err).slice(0, 80)}`);
+    console.log(`  Supabase outreach save skipped: ${String(err).slice(0, 300)}`);
   }
 
   // Save content drafts to Supabase content_items (powers the approvals page)
@@ -1955,7 +2551,7 @@ async function step12_saveOutputs(
           hook: firstLine.slice(0, 300),
           body: d.draft,
           status: 'needs_review',
-          generation_model: 'gpt-4o',
+          generation_model: 'gpt-4o-mini',
           created_at: new Date().toISOString(),
         };
       });
@@ -1963,7 +2559,7 @@ async function step12_saveOutputs(
       if (ciError) console.log(`  Content items Supabase warning: ${ciError.message}`);
       else console.log(`  Saved ${itemsToInsert.length} content drafts to Supabase (visible at /approvals)`);
     } catch (err) {
-      console.log(`  Content items save skipped: ${String(err).slice(0, 80)}`);
+      console.log(`  Content items save skipped: ${String(err).slice(0, 300)}`);
     }
   }
 
@@ -1986,7 +2582,7 @@ async function step12_saveOutputs(
       if (seoError) console.log(`  SEO reports Supabase warning: ${seoError.message}`);
       else console.log(`  Saved ${seoReports.length} SEO reports to Supabase`);
     } catch (err) {
-      console.log(`  SEO reports save skipped: ${String(err).slice(0, 80)}`);
+      console.log(`  SEO reports save skipped: ${String(err).slice(0, 300)}`);
     }
   }
 
@@ -2008,7 +2604,7 @@ async function step12_saveOutputs(
       if (recError) console.log(`  Marketing recs Supabase warning: ${recError.message}`);
       else console.log(`  Saved ${recItems.length} marketing recommendations to Supabase`);
     } catch (err) {
-      console.log(`  Marketing recs save skipped: ${String(err).slice(0, 80)}`);
+      console.log(`  Marketing recs save skipped: ${String(err).slice(0, 300)}`);
     }
   }
 
@@ -2217,7 +2813,7 @@ async function step16_saveMemory(
       console.log(`  Memory saved. Pending: ${pendingActions.length} items. Carry-forward: ${carryForward.length} items.`);
     }
   } catch (err) {
-    console.log(`  Memory save failed: ${String(err).slice(0, 80)}`);
+    console.log(`  Memory save failed: ${String(err).slice(0, 300)}`);
     // This is a P1 failure — alert separately
     await sendTelegram(`⚠️ GABRIEL MEMORY SAVE FAILED — ${TODAY}\nPending actions will not carry forward to tomorrow.\nError: ${String(err).slice(0, 150)}`).catch(() => {});
   }
@@ -2234,9 +2830,16 @@ async function main() {
   console.log('╚══════════════════════════════════════════════════════════════╝');
 
   ensureDataDirs();
+  cleanupOldArtifacts(); // 14-day retention on automation-os/data/
 
   const errors: string[] = [];
   let config: GabrielConfig;
+
+  // Step 0 — preflight health check (abort on P1 failure)
+  const { allCriticalOk } = await step0_healthCheck();
+  if (!allCriticalOk) {
+    process.exit(1);
+  }
 
   // Step 1
   try {

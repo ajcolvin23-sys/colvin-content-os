@@ -1,77 +1,123 @@
 {
+  "_doc": "Canonical model routing config. SOURCE OF TRUTH. Read by lib/ai/model-router.ts. The model_routing block in gabriel-config.json is DEPRECATED and should not be used.",
+  "_updated": "2026-05-28",
+  "_default_reasoning_model": "claude-opus-4-7",
+  "_available_models_verified_2026_05_28": ["claude-opus-4-7", "claude-sonnet-4-6", "claude-opus-4-6", "claude-opus-4-5-20251101", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"],
+  "_provider_split": "Claude (Anthropic) is the primary reasoning core. OpenAI is reserved for bulk dedup/classification where Haiku is overkill.",
+
   "routing_rules": {
     "content_generation": {
-      "model": "gpt-4o",
-      "reason": "Quality required — brand voice, compliance, conversion",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "reason": "Brand voice, compliance, conversion — Sonnet matches Opus on copywriting at 1/5 the cost",
       "max_tokens": 2000,
       "temperature": 0.7
     },
+    "content_variants": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "reason": "Conversion-optimized 3-variant generation with honest scoring — needs Opus reasoning",
+      "max_tokens": 3000,
+      "temperature": 0.65
+    },
     "lead_scoring": {
-      "model": "gpt-4o-mini",
-      "reason": "Deterministic scoring — fast and cheap",
-      "max_tokens": 500,
-      "temperature": 0.2
-    },
-    "outreach_drafts": {
-      "model": "gpt-4o-mini",
-      "reason": "Short-form, templated — mini is sufficient",
-      "max_tokens": 500,
-      "temperature": 0.6
-    },
-    "seo_synthesis": {
-      "model": "gpt-4o",
-      "reason": "Strategic reasoning required for SEO recommendations",
-      "max_tokens": 1500,
-      "temperature": 0.5
-    },
-    "daily_report": {
-      "model": "gpt-4o-mini",
-      "reason": "Summarization — fast and cheap",
-      "max_tokens": 800,
-      "temperature": 0.3
-    },
-    "routing_decisions": {
-      "model": "gpt-4o-mini",
-      "reason": "Simple routing logic — deterministic",
-      "max_tokens": 200,
-      "temperature": 0.1
-    },
-    "qa_review": {
-      "model": "gpt-4o-mini",
-      "reason": "Structured checklist review — no creativity needed",
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "reason": "Deterministic scoring — Haiku is fast, cheap, and accurate for structured judgment",
       "max_tokens": 600,
       "temperature": 0.2
     },
-    "self_audit": {
-      "model": "gpt-4o",
-      "reason": "Semantic analysis of code quality — requires reasoning",
-      "max_tokens": 3000,
-      "temperature": 0.4
-    }
-  },
-  "anthropic_routing": {
-    "deep_strategy": {
-      "model": "claude-opus-4-5",
+    "outreach_drafts": {
       "provider": "anthropic",
-      "reason": "Complex multi-step reasoning — audit, strategy, red team simulation",
-      "max_tokens": 4000,
-      "temperature": 0.4,
-      "use_when": ["system_audit", "campaign_strategy", "compliance_review", "red_team"]
+      "model": "claude-sonnet-4-6",
+      "reason": "Personalized but short — Sonnet matches voice better than Haiku, cheaper than Opus",
+      "max_tokens": 600,
+      "temperature": 0.5
     },
-    "fast_analysis": {
-      "model": "claude-haiku-3-5",
+    "seo_synthesis": {
       "provider": "anthropic",
-      "reason": "Fast structured analysis — dedup, categorization, scoring verification",
+      "model": "claude-opus-4-7",
+      "reason": "Strategic reasoning across keywords, SERPs, competitive gaps — Opus territory",
+      "max_tokens": 2000,
+      "temperature": 0.4
+    },
+    "daily_report": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "reason": "Summarization of daily run data — Haiku is sufficient",
       "max_tokens": 1000,
-      "temperature": 0.2,
-      "use_when": ["deduplication", "categorization", "score_verification"]
+      "temperature": 0.3
+    },
+    "routing_decisions": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "reason": "Planner routing logic — Haiku is fast and structured",
+      "max_tokens": 400,
+      "temperature": 0.1
+    },
+    "qa_review": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "reason": "Structured 10-point checklist review — Haiku is the right tool",
+      "max_tokens": 800,
+      "temperature": 0.2
+    },
+    "self_audit": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "reason": "Semantic analysis of code quality across the whole agent stack — Opus territory",
+      "max_tokens": 4000,
+      "temperature": 0.3
+    },
+    "campaign_strategy": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "reason": "Multi-step strategic planning across content, offer, audience, channel",
+      "max_tokens": 4000,
+      "temperature": 0.4
+    },
+    "compliance_review": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "reason": "Compliance work demands the strongest reasoning — Opus only",
+      "max_tokens": 2500,
+      "temperature": 0.2
+    },
+    "agent_planner": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "reason": "Hermes orchestrator picks agents, builds handoffs — Opus reasoning required",
+      "max_tokens": 1500,
+      "temperature": 0.3
+    },
+    "video_script": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "reason": "Video scripts need voice + structure — Sonnet handles both",
+      "max_tokens": 2500,
+      "temperature": 0.55
+    },
+    "dedup_categorization": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "reason": "Bulk dedup and categorization where token cost dominates and reasoning is trivial",
+      "max_tokens": 300,
+      "temperature": 0.1
     }
   },
+
   "cost_guardrails": {
-    "max_daily_openai_calls": 100,
-    "max_daily_anthropic_calls": 20,
-    "preferred_model_for_bulk": "gpt-4o-mini",
-    "escalate_to_gpt4o_when": ["content_generation", "seo_synthesis", "self_audit"],
-    "escalate_to_claude_when": ["system_audit", "campaign_strategy", "compliance_review"]
+    "max_daily_anthropic_calls": 200,
+    "max_daily_openai_calls": 50,
+    "max_daily_total_cost_usd": 10.00,
+    "alert_threshold_cost_usd": 5.00,
+    "telegram_alert_on_threshold": true
+  },
+
+  "fallback_strategy": {
+    "_doc": "If Claude API is down or rate-limited, fall back to these OpenAI equivalents. Only used after 3 retries on Anthropic.",
+    "claude-opus-4-7": "gpt-4o",
+    "claude-sonnet-4-6": "gpt-4o-mini",
+    "claude-haiku-4-5-20251001": "gpt-4o-mini"
   }
 }

@@ -128,7 +128,11 @@ function renderVideo(videoScript: Record<string, unknown>, videoId: string): str
   if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true })
 
   const format = (videoScript.render_format as string) || (videoScript.format as string) || '9:16'
-  const compositionId = FORMAT_TO_COMPOSITION[format] ?? 'VideoEngine-Vertical'
+  // composition_id in the VideoScript JSON overrides format-based routing
+  // e.g. first_keys_indy sets composition_id: 'FirstKeysAd'
+  const compositionId = (videoScript.composition_id as string)
+    || FORMAT_TO_COMPOSITION[format]
+    || 'VideoEngine-Vertical'
   const outputFile = path.join(OUT_DIR, `${videoId}.mp4`)
   const propsFile  = path.join(OUT_DIR, `${videoId}-props.json`)
 

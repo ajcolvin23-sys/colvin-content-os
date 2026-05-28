@@ -132,12 +132,14 @@
   },
 
   "model_routing": {
-    "content_generation": "gpt-4o",
-    "lead_scoring": "gpt-4o-mini",
-    "outreach_drafts": "gpt-4o-mini",
-    "seo_synthesis": "gpt-4o",
-    "daily_report": "gpt-4o-mini",
-    "routing_decisions": "gpt-4o-mini"
+    "_doc": "DEPRECATED 2026-05-28 — model-routing.json is now source of truth. Runner reads from this for backward compat but values mirror model-routing.json.",
+    "content_generation": "claude-sonnet-4-6",
+    "lead_scoring": "claude-haiku-4-5-20251001",
+    "outreach_drafts": "claude-sonnet-4-6",
+    "seo_synthesis": "claude-opus-4-7",
+    "daily_report": "claude-haiku-4-5-20251001",
+    "routing_decisions": "claude-haiku-4-5-20251001",
+    "dedup_categorization": "gpt-4o-mini"
   },
 
   "notifications": {

@@ -8,6 +8,12 @@ import { ColvinEnterpriseStoryVideo } from './ColvinEnterprises/ColvinEnterprise
 import { ColvinEnterpriseCinematicStory } from './ColvinEnterprises/CinematicStory/ColvinEnterpriseCinematicStory';
 import { VideoEngine, DEFAULT_VIDEO_SCRIPT, calculateVideoEngineMetadata } from './VideoEngine/VideoEngine';
 import type { VideoScript } from './VideoEngine/types';
+import { FirstKeysAd, calculateFirstKeysAdMetadata } from './FirstKeysAd/FirstKeysAd';
+import { defaultAd } from './FirstKeysAd/data/firstKeysAds';
+import { ColvinEnterpriseAd, calculateColvinAdMetadata } from './ColvinEnterpriseAd/ColvinEnterpriseAd';
+import { defaultColvinAd } from './ColvinEnterpriseAd/data/colvinEnterpriseAds';
+import { MusicTheorySecretsAd, calculateMusicAdMetadata } from './MusicTheorySecretsAd/MusicTheorySecretsAd';
+import { defaultMusicAd } from './MusicTheorySecretsAd/data/musicTheoryAds';
 
 // calculateMetadata: dynamically set durationInFrames based on actual slides passed via --props
 const calcDailyMetadata = async ({ props }: { props: DailyVideoProps }) => {
@@ -74,6 +80,45 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1920}
         height={1080}
+      />
+
+      {/* ── FirstKeysAd — high-retention short-form ad engine ── */}
+      {/* Pain-first, hope-first, grant-curiosity, local, and fast-cta variants */}
+      <Composition
+        id="FirstKeysAd"
+        component={FirstKeysAd}
+        durationInFrames={750}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ ad: defaultAd }}
+        calculateMetadata={calculateFirstKeysAdMetadata}
+      />
+
+      {/* ── ColvinEnterpriseAd — high-retention lead-gen ad engine ── */}
+      {/* Task-chaos, revenue-leak, automation-reveal, ai-staff, and fast-cta variants */}
+      <Composition
+        id="ColvinEnterpriseAd"
+        component={ColvinEnterpriseAd}
+        durationInFrames={720}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ ad: defaultColvinAd }}
+        calculateMetadata={calculateColvinAdMetadata}
+      />
+
+      {/* ── MusicTheorySecretsAd — chord cards, keyboard, number system ── */}
+      {/* chord-pattern, frustration-first, number-system-reveal, fast-cta variants */}
+      <Composition
+        id="MusicTheorySecretsAd"
+        component={MusicTheorySecretsAd}
+        durationInFrames={720}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ ad: defaultMusicAd }}
+        calculateMetadata={calculateMusicAdMetadata}
       />
 
       {/* ── VideoEngine — JSON-driven compositions (Gabriel writes JSON, not code) ── */}

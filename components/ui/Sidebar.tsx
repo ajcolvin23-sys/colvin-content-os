@@ -1,52 +1,45 @@
-'use client'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+// Server component that loads hubs + active scope, then renders the client SidebarNav.
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getActiveHubScope } from '@/lib/crm/hub-scope'
+import SidebarNav from './SidebarNav'
 
-const nav = [
-  { href: '/dashboard', label: 'Dashboard', icon: '⚡' },
-  { href: '/calendar', label: 'Calendar', icon: '📅' },
-  { href: '/create', label: 'Create Content', icon: '✏️' },
-  { href: '/piano-videos', label: 'Piano Videos', icon: '🎹' },
-  { href: '/backflow-facebook', label: 'Backflow Facebook', icon: '💧' },
-  { href: '/linkedin', label: 'LinkedIn', icon: '💼' },
-  { href: '/assets', label: 'Assets', icon: '🗂️' },
-  { href: '/approvals', label: 'Approvals', icon: '✅' },
-  { href: '/post-queue', label: 'Post Queue', icon: '📱' },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
-  { href: '/logs', label: 'Audit Logs', icon: '📋' },
-]
+interface HubRow {
+  id: string
+  name: string
+  slug: string
+  color: string | null
+  priority: string | null
+}
 
-export default function Sidebar() {
-  const pathname = usePathname()
-  return (
-    <aside className="fixed top-0 left-0 h-full w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-50">
-      <div className="p-5 border-b border-gray-800">
-        <div className="text-lg font-bold text-white">Colvin Content OS</div>
-        <div className="text-xs text-gray-400 mt-0.5">Alfred Colvin</div>
-      </div>
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {nav.map(({ href, label, icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                active
-                  ? 'bg-blue-600 text-white font-medium'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
-              }`}
-            >
-              <span className="text-base">{icon}</span>
-              {label}
-            </Link>
-          )
-        })}
-      </nav>
-      <div className="p-4 border-t border-gray-800 text-xs text-gray-500">
-        <div>Draft-first. Human approval.</div>
-        <div className="mt-1">No auto-post without permission.</div>
-      </div>
-    </aside>
-  )
+export default async function Sidebar() {
+  // Load all hubs ordered by priority (Critical → High → Medium → Low → Future)
+  // and scope cookie. Both fail gracefully — sidebar renders even if DB is down.
+  let hubs: HubRow[] = []
+  let scope: string | null = null
+
+  try {
+    const supabase = createAdminClient()
+    const { data } = await supabase
+      .from('hubs')
+      .select('id, name, slug, color, priority')
+      .order('name')
+    hubs = (data ?? []) as HubRow[]
+    // Sort by priority manually since text ordering doesn't match logical order
+    const priorityOrder: Record<string, number> = {
+      'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3, 'Future': 4,
+    }
+    hubs.sort((a, b) =>
+      (priorityOrder[a.priority ?? 'Medium'] ?? 5) - (priorityOrder[b.priority ?? 'Medium'] ?? 5)
+    )
+  } catch {
+    // DB unavailable → empty hub list; selector will show "All hubs" only
+  }
+
+  try {
+    scope = await getActiveHubScope()
+  } catch {
+    scope = null
+  }
+
+  return <SidebarNav hubs={hubs} activeScope={scope} />
 }

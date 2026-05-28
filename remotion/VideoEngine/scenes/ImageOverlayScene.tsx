@@ -1,19 +1,32 @@
 /**
- * ImageOverlayScene
+ * ImageOverlayScene — CINEMATIC UPGRADE
  *
- * Full-bleed photo of a person with text overlaid on a gradient.
- * Used when a scene has assets[0].url set (populated by fetchAssets.ts before render).
+ * Full-bleed OpenAI-generated image with cinematic motion, mood grading,
+ * kinetic typography, light sweep, and vignette.
  *
- * Layout:
- *   - Photo fills the frame (objectFit: cover)
- *   - Dark gradient overlay bottom-to-top so text is always readable
- *   - Headline + body text sit in the bottom third
- *   - Caption bar at the very bottom
- *   - Falls back gracefully to brand color if no image URL
+ * Motion modes (scene.motion_direction):
+ *   push_in     — Ken Burns zoom in (default for hook/problem)
+ *   pull_back   — Ken Burns zoom out (solution/cta)
+ *   drift_left  — slow pan left
+ *   drift_right — slow pan right
+ *   pan_up      — slow tilt upward
+ *   pan_down    — slow tilt downward
+ *
+ * Color grades (scene.color_grade):
+ *   cold     — blue tint: tension, struggle
+ *   warm     — amber tint: triumph, warmth
+ *   dramatic — deep desaturation
+ *   neutral  — minimal tint
+ *   none     — no grade
+ *
+ * Overlay intensity (scene.overlay_intensity):
+ *   light 15% / medium 32% (default) / heavy 55%
  */
 import React from 'react';
-import { AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Img, interpolate, spring, useVideoConfig } from 'remotion';
 import type { BrandConfig, SceneDefinition } from '../types';
+import { KineticHeadline } from '../components/KineticHeadline';
+import { LightSweep } from '../components/LightSweep';
 
 interface Props {
   scene: SceneDefinition;
@@ -22,229 +35,182 @@ interface Props {
   durationInFrames: number;
 }
 
+const PROBLEM_TYPES = new Set(['hook', 'problem', 'pain_stack']);
+const SOLUTION_TYPES = new Set(['desire', 'solution', 'transformation', 'cta', 'mechanism', 'proof']);
+
+function resolveColorGrade(
+  grade: SceneDefinition['color_grade'],
+  sceneType: string,
+): { color: string; opacity: number } | null {
+  const g = grade ?? (PROBLEM_TYPES.has(sceneType) ? 'cold' : SOLUTION_TYPES.has(sceneType) ? 'warm' : 'neutral');
+  if (g === 'cold')     return { color: 'rgb(18,42,90)',   opacity: 0.32 };
+  if (g === 'warm')     return { color: 'rgb(180,100,20)', opacity: 0.24 };
+  if (g === 'dramatic') return { color: 'rgb(8,8,20)',     opacity: 0.45 };
+  if (g === 'neutral')  return { color: 'rgb(0,0,0)',      opacity: 0.15 };
+  return null; // 'none'
+}
+
+function resolveOverlay(intensity: SceneDefinition['overlay_intensity']): number {
+  if (intensity === 'light') return 0.15;
+  if (intensity === 'heavy') return 0.55;
+  return 0.32;
+}
+
 export const ImageOverlayScene: React.FC<Props> = ({ scene, brand, localFrame, durationInFrames }) => {
   const { fps } = useVideoConfig();
 
-  const imageUrl = scene.assets?.[0]?.url;
+  const imageUrl      = scene.assets?.[0]?.url;
   const fallbackColor = scene.assets?.[0]?.fallback_color ?? brand.background_color;
+  const motionDir     = scene.motion_direction ?? (PROBLEM_TYPES.has(scene.type) ? 'push_in' : 'pull_back');
 
-  // Animations
-  const fadeIn   = interpolate(localFrame, [0, 12], [0, 1], { extrapolateRight: 'clamp' });
-  const textY    = interpolate(localFrame, [0, 18], [40, 0], { extrapolateRight: 'clamp' });
-  const imgScale = interpolate(localFrame, [0, durationInFrames], [1.08, 1.0], { extrapolateRight: 'clamp' }); // Ken Burns
-  const badgeScale = spring({ frame: localFrame, fps, config: { damping: 14, stiffness: 100 } });
+  // Scene fade
+  const sceneOpacity = interpolate(localFrame, [0, 8], [0, 1], { extrapolateRight: 'clamp' });
 
-  const headline = scene.headline ?? '';
-  const emphasis = scene.emphasis;
+  // Image motion
+  let imgScale = 1.0;
+  let imgX = 0;
+  let imgY = 0;
 
-  const renderHeadline = () => {
-    if (!emphasis || !headline.includes(emphasis)) return <span>{headline}</span>;
-    const parts = headline.split(emphasis);
-    return (
-      <>
-        {parts[0]}
-        <span style={{ color: brand.accent_color, fontStyle: 'italic' }}>{emphasis}</span>
-        {parts[1]}
-      </>
-    );
-  };
+  if (motionDir === 'push_in') {
+    imgScale = interpolate(localFrame, [0, durationInFrames], [1.18, 1.0], { extrapolateRight: 'clamp' });
+    imgX     = interpolate(localFrame, [0, durationInFrames], [14, 0],    { extrapolateRight: 'clamp' });
+  } else if (motionDir === 'pull_back') {
+    imgScale = interpolate(localFrame, [0, durationInFrames], [1.0, 1.18], { extrapolateRight: 'clamp' });
+    imgX     = interpolate(localFrame, [0, durationInFrames], [0, -14],    { extrapolateRight: 'clamp' });
+  } else if (motionDir === 'drift_left') {
+    imgX     = interpolate(localFrame, [0, durationInFrames], [24, -24], { extrapolateRight: 'clamp' });
+    imgScale = 1.08;
+  } else if (motionDir === 'drift_right') {
+    imgX     = interpolate(localFrame, [0, durationInFrames], [-24, 24], { extrapolateRight: 'clamp' });
+    imgScale = 1.08;
+  } else if (motionDir === 'pan_up') {
+    imgY     = interpolate(localFrame, [0, durationInFrames], [40, -20], { extrapolateRight: 'clamp' });
+    imgScale = 1.1;
+  } else if (motionDir === 'pan_down') {
+    imgY     = interpolate(localFrame, [0, durationInFrames], [-20, 40], { extrapolateRight: 'clamp' });
+    imgScale = 1.1;
+  }
+
+  // Text animations
+  const bodyOpacity = interpolate(localFrame, [14, 24], [0, 1], { extrapolateRight: 'clamp' });
+  const bodyY       = interpolate(localFrame, [14, 24], [20, 0], { extrapolateRight: 'clamp' });
+  const barScale    = spring({ frame: localFrame, fps, config: { damping: 20 } });
+
+  // Grading
+  const grade   = resolveColorGrade(scene.color_grade, scene.type);
+  const overlay = resolveOverlay(scene.overlay_intensity);
 
   return (
-    <AbsoluteFill style={{ opacity: fadeIn, overflow: 'hidden' }}>
+    <AbsoluteFill style={{ opacity: sceneOpacity, overflow: 'hidden' }}>
 
-      {/* ── Background: photo or fallback color ── */}
+      {/* OpenAI image or brand color fallback */}
       {imageUrl ? (
-        <Img
-          src={imageUrl}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            objectPosition: 'center top',
-            transform: `scale(${imgScale})`,
-            transformOrigin: 'center center',
-          }}
-        />
+        <div style={{ position: 'absolute', inset: '-6%', transform: `translateX(${imgX}px) translateY(${imgY}px)` }}>
+          <Img
+            src={imageUrl}
+            style={{
+              width: '100%', height: '100%',
+              objectFit: 'cover', objectPosition: 'center top',
+              transform: `scale(${imgScale})`,
+              transformOrigin: 'center center',
+            }}
+          />
+        </div>
       ) : (
-        <div style={{ position: 'absolute', inset: 0, background: fallbackColor }} />
+        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${fallbackColor}, ${brand.background_color})` }} />
       )}
 
-      {/* ── Gradient overlay — makes text readable ── */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: imageUrl
-            ? 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.15) 75%, rgba(0,0,0,0.0) 100%)'
-            : `linear-gradient(160deg, ${brand.primary_color}DD, ${brand.background_color})`,
-        }}
-      />
+      {/* Base darkness */}
+      {imageUrl && <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${overlay})` }} />}
 
-      {/* ── Optional scene-type badge (top left) ── */}
-      {scene.type !== 'slide' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '72px',
-            left: '48px',
-            background: `${brand.accent_color}22`,
-            border: `2px solid ${brand.accent_color}88`,
-            borderRadius: '100px',
-            padding: '8px 24px',
-            fontFamily: brand.font_body,
-            fontSize: '22px',
-            fontWeight: 700,
-            letterSpacing: '3px',
-            textTransform: 'uppercase',
-            color: brand.accent_color,
-            transform: `scale(${badgeScale})`,
-            transformOrigin: 'left center',
-          }}
-        >
-          {scene.type.replace('_', ' ')}
-        </div>
+      {/* Vignette */}
+      {imageUrl && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'radial-gradient(ellipse at 50% 40%, transparent 18%, rgba(0,0,0,0.68) 100%)',
+        }} />
       )}
 
-      {/* ── Text block — bottom third ── */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: scene.caption_text ? '160px' : '80px',
-          left: '48px',
-          right: '48px',
-          transform: `translateY(${textY}px)`,
-        }}
-      >
-        {/* Accent bar */}
-        <div
-          style={{
-            width: '64px',
-            height: '5px',
-            background: brand.accent_color,
-            borderRadius: '3px',
-            marginBottom: '20px',
-          }}
-        />
+      {/* Mood color grade */}
+      {imageUrl && grade && (
+        <div style={{ position: 'absolute', inset: 0, background: grade.color, opacity: grade.opacity }} />
+      )}
 
-        {/* Headline */}
-        <div
-          style={{
-            fontFamily: brand.font_headline,
-            fontSize: '60px',
-            fontWeight: 900,
-            color: '#FFFFFF',
-            lineHeight: 1.15,
-            letterSpacing: '-1.5px',
-            textShadow: '0 2px 12px rgba(0,0,0,0.5)',
-          }}
-        >
-          {renderHeadline()}
-        </div>
+      {/* Bottom gradient — ensures text over any image */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: imageUrl
+          ? 'linear-gradient(to bottom, transparent 0%, transparent 30%, rgba(0,0,0,0.50) 60%, rgba(0,0,0,0.88) 100%)'
+          : 'none',
+      }} />
 
-        {/* Body */}
+      {/* Top vignette — top text readable */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: '300px',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.48) 0%, transparent 100%)',
+      }} />
+
+      {/* Light sweep — cinematic entrance */}
+      <LightSweep localFrame={localFrame} startFrame={2} duration={22} />
+
+      {/* Accent bar */}
+      <div style={{ position: 'absolute', top: 148, left: 56, right: 56, display: 'flex', justifyContent: 'center' }}>
+        <div style={{
+          width: 64, height: 5,
+          background: brand.accent_color,
+          borderRadius: 3,
+          transform: `scaleX(${barScale})`,
+          transformOrigin: 'left center',
+          boxShadow: `0 0 14px ${brand.accent_color}66`,
+        }} />
+      </div>
+
+      {/* Text content */}
+      <div style={{
+        position: 'absolute',
+        top: 172, left: 56, right: 56, bottom: 280,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 24,
+      }}>
+        {scene.headline && (
+          <KineticHeadline
+            text={scene.headline}
+            localFrame={localFrame}
+            fontFamily={brand.font_headline}
+            color={brand.text_color}
+            accentColor={brand.accent_color}
+            emphasis={scene.emphasis}
+            size="lg"
+            staggerFrames={4}
+            startDelay={4}
+            glowEmphasis
+            style={{ textAlign: 'center', maxWidth: '960px' }}
+          />
+        )}
         {scene.body && (
-          <div
-            style={{
-              fontFamily: brand.font_body,
-              fontSize: '30px',
-              color: 'rgba(255,255,255,0.85)',
-              lineHeight: 1.45,
-              marginTop: '20px',
-              textShadow: '0 1px 8px rgba(0,0,0,0.6)',
-            }}
-          >
+          <div style={{
+            fontFamily: brand.font_body, fontSize: 34, fontWeight: 500,
+            color: `${brand.text_color}CC`, textAlign: 'center',
+            lineHeight: 1.45, maxWidth: 880,
+            opacity: bodyOpacity, transform: `translateY(${bodyY}px)`,
+          }}>
             {scene.body}
-          </div>
-        )}
-
-        {/* Stat (proof scenes) */}
-        {scene.stat && (
-          <div style={{ marginTop: '24px' }}>
-            <div
-              style={{
-                fontFamily: brand.font_headline,
-                fontSize: '96px',
-                fontWeight: 900,
-                color: brand.accent_color,
-                lineHeight: 1,
-                textShadow: `0 0 40px ${brand.accent_color}66`,
-              }}
-            >
-              {scene.stat}
-            </div>
-            {scene.stat_label && (
-              <div
-                style={{
-                  fontFamily: brand.font_body,
-                  fontSize: '28px',
-                  color: 'rgba(255,255,255,0.75)',
-                  marginTop: '8px',
-                }}
-              >
-                {scene.stat_label}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* CTA */}
-        {scene.cta_text && (
-          <div
-            style={{
-              display: 'inline-block',
-              marginTop: '32px',
-              background: brand.accent_color,
-              color: brand.background_color,
-              fontFamily: brand.font_headline,
-              fontSize: '32px',
-              fontWeight: 800,
-              padding: '16px 40px',
-              borderRadius: '12px',
-              letterSpacing: '-0.5px',
-            }}
-          >
-            {scene.cta_text}
           </div>
         )}
       </div>
 
-      {/* ── Caption bar ── */}
+      {/* Caption */}
       {scene.caption_text && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '48px',
-            left: '48px',
-            right: '48px',
-            fontFamily: brand.font_body,
-            fontSize: '26px',
-            color: '#FFFFFF',
-            textAlign: 'center',
-            backgroundColor: 'rgba(0,0,0,0.72)',
-            padding: '12px 20px',
-            borderRadius: '10px',
-            backdropFilter: 'blur(4px)',
-          }}
-        >
+        <div style={{
+          position: 'absolute', bottom: 60, left: 56, right: 56,
+          fontFamily: brand.font_body, fontSize: 26, fontWeight: 600,
+          color: brand.text_color, textAlign: 'center',
+          background: 'rgba(0,0,0,0.72)',
+          backdropFilter: 'blur(8px)',
+          padding: '12px 24px', borderRadius: 12, lineHeight: 1.4,
+        }}>
           {scene.caption_text}
-        </div>
-      )}
-
-      {/* ── Photo credit (bottom right, tiny) ── */}
-      {imageUrl && scene.assets?.[0]?.description && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '12px',
-            right: '16px',
-            fontFamily: brand.font_body,
-            fontSize: '16px',
-            color: 'rgba(255,255,255,0.35)',
-          }}
-        >
-          📷 Pexels
         </div>
       )}
     </AbsoluteFill>

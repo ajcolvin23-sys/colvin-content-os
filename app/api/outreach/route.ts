@@ -4,6 +4,88 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { generateOutreachDraft } from '@/lib/ai/generate'
 import { logAction } from '@/lib/audit'
 
+// ── PATCH /api/outreach — approve, reject, revise, or mark sent on outreach_drafts ──
+
+const PatchSchema = z.object({
+  id: z.string().uuid(),
+  action: z.enum(['approve', 'reject', 'revise', 'mark_sent']),
+  feedback: z.string().max(1000).optional(),
+})
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const parsed = PatchSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+
+    const { id, action, feedback } = parsed.data
+    const supabase = createAdminClient()
+
+    // Fetch current draft
+    const { data: draft, error: fetchErr } = await supabase
+      .from('outreach_drafts')
+      .select('id, lead_name, lane, status, revision_count, katrina_review_required')
+      .eq('id', id)
+      .single()
+
+    if (fetchErr || !draft) {
+      return NextResponse.json({ error: 'Outreach draft not found' }, { status: 404 })
+    }
+
+    // Safety: cannot approve a Katrina-gated draft without feedback acknowledging it
+    if (action === 'approve' && draft.katrina_review_required && !feedback) {
+      return NextResponse.json({
+        error: 'This draft requires Katrina compliance review. Add a confirmation note before approving.',
+        code: 'katrina_gate',
+      }, { status: 403 })
+    }
+
+    // Safety: cannot mark a draft sent without it being approved first
+    if (action === 'mark_sent' && draft.status !== 'approved') {
+      return NextResponse.json({
+        error: 'Only approved drafts can be marked as sent.',
+        code: 'not_approved',
+      }, { status: 409 })
+    }
+
+    const statusMap: Record<string, string> = {
+      approve: 'approved',
+      reject: 'rejected',
+      revise: 'revised',
+      mark_sent: 'sent',
+    }
+
+    const updateFields: Record<string, unknown> = {
+      status: statusMap[action],
+      updated_at: new Date().toISOString(),
+    }
+    if (feedback) updateFields.alfred_feedback = feedback
+    if (action === 'revise') updateFields.revision_count = (draft.revision_count ?? 0) + 1
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('outreach_drafts')
+      .update(updateFields)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+    await logAction(
+      `outreach_draft_${action}`,
+      'outreach_draft',
+      id,
+      draft.lead_name ?? 'Unknown',
+      { lane: draft.lane, previous_status: draft.status, new_status: statusMap[action], feedback }
+    )
+
+    return NextResponse.json({ success: true, draft: updated })
+  } catch (err) {
+    console.error('[outreach PATCH]', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
+
 const ProspectSchema = z.object({
   platform: z.string().default('linkedin'),
   name: z.string().min(1),

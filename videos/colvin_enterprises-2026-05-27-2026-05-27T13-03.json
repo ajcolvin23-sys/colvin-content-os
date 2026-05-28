@@ -1,0 +1,106 @@
+{
+  "video_id": "colvin_enterprises-2026-05-27-2026-05-27T13-03",
+  "created_at": "2026-05-27T13:05:09.052Z",
+  "brand": "colvin_enterprises",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "composition_id": "ColvinEnterpriseAd",
+  "title": "Reclaim Your Time",
+  "audience": "Small business owners and entrepreneurs",
+  "goal": "Book a free workflow audit",
+  "hook": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+      "caption_text": "Manual work costs you!",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "The most expensive thing in your business isn't software. It's manual work disguised as a job description.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "business professional looking overwhelmed and stressed, surrounded by piles of paperwork, working late at a cluttered desk",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/8468122/pexels-photo-8468122.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-2",
+      "type": "pain",
+      "duration_seconds": 4,
+      "lines": [
+        "Stressed and tired?",
+        "Working late again?",
+        "It doesn’t have to be this way."
+      ],
+      "headline": "You’re not alone.",
+      "motion": "kinetic",
+      "transition": "cut",
+      "voiceover": "Are you overwhelmed? Working late into the night? It doesn’t have to be this way."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "Reclaim your time.",
+      "body": "Imagine reclaiming those hours, focusing on what truly matters. You can streamline your processes.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Imagine reclaiming those hours, focusing on what truly matters. You can streamline your processes."
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "A pathway to success.",
+      "body": "Freeing up time means you can grow your business without hiring new staff.",
+      "stat": null,
+      "stat_label": null,
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "Freeing up time means you can grow your business without hiring new staff.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "business professional looking relaxed and confident in a modern office, enjoying a productive work environment",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/12871460/pexels-photo-12871460.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Ready to take action?",
+      "cta_text": "Book a free 30-min workflow audit",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Book a free 30-min workflow audit today to get started."
+    }
+  ],
+  "voiceover_script": "The most expensive thing in your business isn't software. It's manual work disguised as a job description. Are you overwhelmed? Working late into the night? It doesn’t have to be this way. Imagine reclaiming those hours, focusing on what truly matters. You can streamline your processes. Freeing up time means you can grow your business without hiring new staff. It's possible! Let's make it happen. Book a free 30-min workflow audit today to get started.",
+  "music_direction": "ambient gospel piano",
+  "thumbnail_concept": "An overwhelmed office worker transitioning to a relaxed, confident entrepreneur.",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Reclaim your time with a free workflow audit. Let’s streamline your business!",
+  "caption_hook": "Stop wasting time on manual work",
+  "hashtags": [
+    "#BusinessEfficiency",
+    "#WorkflowAudit",
+    "#SmallBusiness"
+  ]
+}

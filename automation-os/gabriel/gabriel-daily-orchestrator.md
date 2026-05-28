@@ -111,6 +111,76 @@ Runs daily at 7:00 AM CST via:
 - Character limit: under 4096 chars
 - Do NOT include full drafts — just the brief + "Review queue ready in Content OS"
 
+---
+
+## Video Orchestration Rule
+
+When a task involves video content — scripts, Remotion builds, TikTok/Reels/Shorts, LinkedIn video, ad creative, hook testing, CTA optimization, or video audits — Gabriel must follow this sequence:
+
+### Step 1 — Activate Master Skill
+Load `skills/video-growth-architect` FIRST for every video task.
+
+### Step 2 — Identify Brand and Load Brand Skill
+
+| Brand | Brand Skill |
+|---|---|
+| First Keys Indy | `skills/first-keys-indy-video` |
+| Colvin Enterprises | `skills/colvin-enterprises-video` |
+| Music Theory Secrets | `skills/music-theory-secrets-video` |
+| Indiana Backflow / Other | Use `video-growth-architect` alone + BRAND_GUIDE.md |
+
+### Step 3 — Research Gate (for major campaigns)
+
+If the task is a major campaign (4+ videos), monthly batch, or new ad test:
+- Check `research/video_engagement/` for files newer than 14 days
+- If no recent research: activate `skills/platform-engagement-research` FIRST
+- If recent research exists: apply findings directly
+
+Skip research gate for: single daily posts, quick rewrites, compliance reviews.
+
+### Step 4 — Select Operating Mode
+
+| Request type | Mode |
+|---|---|
+| Daily content / quick post | Fast Mode |
+| Planned social video / weekly batch | Standard Mode |
+| Ad creative / Remotion build / campaign launch / audit | Deep Mode |
+
+### Step 5 — Composition Routing
+
+Gabriel must always set `composition_id` in VideoScript JSON:
+
+| Lane | composition_id |
+|---|---|
+| `first_keys_indy` | `FirstKeysAd` |
+| `colvin_enterprises` | `ColvinEnterpriseAd` |
+| `music_theory_secrets` | `MusicTheorySecretsAd` |
+| All others | `VideoEngine-Vertical` (or Square/Wide per format) |
+
+### Step 6 — Required Ending
+
+Every major video response must end with:
+1. **Script** — full scene-by-scene copy
+2. **Scene breakdown** — type, duration, visual direction, caption, motion note
+3. **CTA** — primary, secondary, button label, footer URL
+4. **Remotion notes** — composition_id, scene list, key animations
+5. **A/B test idea** — one specific hypothesis with metric
+6. **Compliance check** — brand-specific language pass/fail
+
+### Video System Reference
+
+Remotion compositions live at:
+- `remotion/FirstKeysAd/` — FirstKeysAd
+- `remotion/ColvinEnterpriseAd/` — ColvinEnterpriseAd
+- `remotion/MusicTheorySecretsAd/` — MusicTheorySecretsAd
+- `remotion/VideoEngine/` — all other lanes
+
+Render pipeline: `npm run gabriel:daily` → generates VideoScript JSON → `npm run render:daily` → renders MP4 → Telegram notification.
+
+Research output: `automation-os/gabriel/research/video_engagement/YYYY-MM-DD_[platform]_[brand].md`
+
+---
+
 ## Error Handling
 
 - Any step failure → log error + skip step + continue to next step

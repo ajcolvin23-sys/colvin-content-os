@@ -47,6 +47,12 @@ automation-os/gabriel/research-output/
 automation-os/gabriel/skill-improvements/
 automation-os/gabriel/skills/**/failure-log.md
 
-# Local/customer-like runtime data
+# Local/customer-like runtime data — all rotate daily, gitignored to keep repo clean
 automation-os/data/leads/
+automation-os/data/content/
+automation-os/data/outreach/
+automation-os/data/reports/
+automation-os/data/campaigns/
+automation-os/data/review-queue/
+automation-os/data/artifacts-latest/
 logs/

@@ -31,18 +31,21 @@ export type Platform =
 export type VideoFormat = '9:16' | '1:1' | '16:9';
 
 // ── Scene Types ───────────────────────────────────────────────────────────────
-// Each type maps to a prebuilt scene component in /scenes/
 export type SceneType =
-  | 'hook'          // Attention-grabbing opener — big bold statement
-  | 'problem'       // Pain point / problem statement
-  | 'solution'      // The answer / offer reveal
-  | 'proof'         // Credibility — result, testimonial, stat
-  | 'step'          // Step-by-step instruction
-  | 'slide'         // Generic slide — title + body text
-  | 'cta'           // Call to action end card
-  | 'logo_intro'    // Brand logo opener
-  | 'lower_third'   // Name/title overlay on another scene
-  | 'countdown';    // Countdown timer overlay
+  | 'hook'           // Pattern interrupt opener — punch-in text, immediate image motion
+  | 'pain_stack'     // 2–3 staggered pain points, kinetic rhythm, tension
+  | 'desire'         // Hope shift — from pain toward the outcome
+  | 'mechanism'      // 3-step solution cards — how the offer works
+  | 'transformation' // Before/after emotional payoff — confidence, control, clarity
+  | 'problem'        // Generic pain point statement
+  | 'solution'       // Offer reveal
+  | 'proof'          // Stat / credibility
+  | 'step'           // Step-by-step
+  | 'slide'          // Generic slide
+  | 'cta'            // CTA end card — pulsing button, branded close
+  | 'logo_intro'
+  | 'lower_third'
+  | 'countdown';
 
 // ── Caption Entry ─────────────────────────────────────────────────────────────
 export interface CaptionEntry {
@@ -59,24 +62,59 @@ export interface AssetRef {
   fallback_color?: string; // Background color if asset not found
 }
 
+// ── Step Definition (for mechanism scenes) ───────────────────────────────────
+export interface StepDefinition {
+  number: string;        // "1", "2", "3" or emoji
+  title: string;         // Step name
+  description?: string;  // Optional brief description
+}
+
 // ── Scene Definition ──────────────────────────────────────────────────────────
 export interface SceneDefinition {
-  id: string;                     // Unique within this video
+  id: string;
   type: SceneType;
-  duration_seconds: number;       // Scene length in seconds (converted to frames by engine)
-  headline?: string;              // Primary text (large)
-  body?: string;                  // Secondary text (smaller)
-  emphasis?: string;              // Highlighted word/phrase (accent color)
-  caption_text?: string;          // Subtitle/caption shown at bottom
-  stat?: string;                  // For proof scenes: the big number/stat
-  stat_label?: string;            // Label below the stat
-  cta_text?: string;              // For CTA scenes: button/end card text
-  cta_url?: string;               // URL to show in CTA
+  duration_seconds: number;
+
+  // Text content
+  headline?: string;
+  body?: string;
+  emphasis?: string;          // Word/phrase highlighted in accent color
+  caption_text?: string;
+
+  // Proof scenes
+  stat?: string;
+  stat_label?: string;
+
+  // CTA scenes
+  cta_text?: string;
+  cta_url?: string;
+
+  // Pain stack — list of pain point strings
+  pain_points?: string[];
+
+  // Mechanism — list of 3 step cards
+  steps?: StepDefinition[];
+
+  // Transformation — before/after state descriptions
+  before_state?: string;
+  after_state?: string;
+
+  // Image motion direction for ImageOverlayScene
+  motion_direction?: 'push_in' | 'pull_back' | 'drift_left' | 'drift_right' | 'pan_up' | 'pan_down';
+
+  // Color grade override (overrides auto mood detection)
+  color_grade?: 'cold' | 'warm' | 'neutral' | 'dramatic' | 'none';
+
+  // Overlay darkness: 'light' | 'medium' | 'heavy'
+  overlay_intensity?: 'light' | 'medium' | 'heavy';
+
+  // Legacy motion/transition fields
   motion?: 'fade' | 'slide_up' | 'slide_left' | 'zoom_in' | 'none';
   transition?: 'fade' | 'wipe' | 'cut' | 'none';
-  background_override?: string;   // Override brand background color for this scene
-  assets?: AssetRef[];            // Images/icons needed for this scene
-  voiceover?: string;             // Voiceover text for this scene
+
+  background_override?: string;
+  assets?: AssetRef[];
+  voiceover?: string;
 }
 
 // ── Claims Check ──────────────────────────────────────────────────────────────
@@ -110,7 +148,11 @@ export interface VideoScript {
 
   // Audio
   voiceover_script?: string;      // Full voiceover script (all scenes combined)
+  voiceover_url?: string;         // Resolved: path to generated voiceover MP3
+  voiceover_voice?: 'onyx' | 'nova' | 'fable' | 'echo' | 'alloy' | 'shimmer'; // TTS voice
   music_direction?: string;       // Music mood/style description
+  music_url?: string;             // Resolved: path to background music MP3
+  music_volume?: number;          // Background music volume 0–1 (default 0.18)
   captions?: CaptionEntry[];      // Pre-generated caption timing (optional)
 
   // Output

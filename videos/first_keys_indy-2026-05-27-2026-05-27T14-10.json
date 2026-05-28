@@ -1,0 +1,106 @@
+{
+  "video_id": "first_keys_indy-2026-05-27-2026-05-27T14-10",
+  "created_at": "2026-05-27T14:27:22.517Z",
+  "brand": "first_keys_indy",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "composition_id": "FirstKeysAd",
+  "title": "Homeownership Made Possible",
+  "audience": "Minority first-time homebuyers in Marion County",
+  "goal": "Encourage viewers to check if they qualify for down payment assistance",
+  "hook": "The down payment isn't the barrier you think it is — not if you live in Marion County.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "The down payment isn't the barrier you think it is — not if you live in Marion County.",
+      "caption_text": "Homeownership is within reach",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "The down payment isn't the barrier you think it is — not if you live in Marion County.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "Cinematic close-up of a Black woman, worried and exhausted, sitting in a dim apartment — portrait, dramatic side light",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/7193540/pexels-photo-7193540.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-2",
+      "type": "pain",
+      "duration_seconds": 4,
+      "lines": [
+        "Homeownership feels impossible.",
+        "Too many bills to pay.",
+        "But there is hope."
+      ],
+      "headline": "Backup headline if lines not used",
+      "motion": "kinetic",
+      "transition": "cut",
+      "voiceover": "Many believe homeownership is out of reach because of the down payment."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "Grants available for you!",
+      "body": "What if I told you that there are grants available specifically for minority first-time homebuyers? These grants can cover your entire down payment.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "But what if I told you that there are grants available specifically for minority first-time homebuyers? These grants can cover your entire down payment."
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "Imagine the joy!",
+      "body": "You could own a home without needing to put any money down. Imagine holding the keys to your first home.",
+      "stat": null,
+      "stat_label": null,
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "Imagine holding the keys to your first home and feeling the joy and relief that comes with it.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "Cinematic portrait of a joyful Black family holding house keys outside their first home, tears of joy, warm golden hour light",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/8470840/pexels-photo-8470840.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Check your eligibility!",
+      "cta_text": "See if you qualify — it takes 2 minutes",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "See if you qualify — it takes just 2 minutes."
+    }
+  ],
+  "voiceover_script": "The down payment isn't the barrier you think it is — not if you live in Marion County. Many believe homeownership is out of reach because of the down payment. But what if I told you that there are grants available specifically for minority first-time homebuyers? These grants can cover your entire down payment, meaning you could own a home without needing to put any money down. Imagine holding the keys to your first home and feeling the joy and relief that comes with it. See if you qualify — it takes just 2 minutes.",
+  "music_direction": "uplifting acoustic guitar",
+  "thumbnail_concept": "A joyful Black family holding house keys in front of their new home.",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Homeownership is closer than you think. Check your eligibility today!",
+  "caption_hook": "Think a down payment is a barrier?",
+  "hashtags": [
+    "#Homeownership",
+    "#IndyHomes",
+    "#MinorityHomebuyers"
+  ]
+}

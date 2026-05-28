@@ -1,0 +1,101 @@
+{
+  "video_id": "colvin_enterprises-2026-05-26-2026-05-26T03-55",
+  "created_at": "2026-05-26T03:56:11.492Z",
+  "brand": "colvin_enterprises",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "title": "Reclaim Time and Payroll",
+  "audience": "Small business owners in Indianapolis",
+  "goal": "Encourage workflow audit bookings",
+  "hook": "You're paying people to be robots.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "You're paying people to be robots.",
+      "caption_text": "Stop robot work",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "You're paying people to be robots.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "Black woman looking confident and determined, portrait",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/8468122/pexels-photo-8468122.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-2",
+      "type": "problem",
+      "duration_seconds": 8,
+      "headline": "Repetitive tasks drain payroll",
+      "body": "Every day, your team spends hours on repetitive tasks that drain your payroll.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Every day, your team spends hours on repetitive tasks that drain your payroll."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "Reclaim time without new hires",
+      "body": "Imagine reclaiming that time without hiring anyone new. At Colvin Enterprises, we help businesses streamline operations.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Imagine reclaiming that time without hiring anyone new. At Colvin Enterprises, we help businesses like yours streamline operations."
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "Example: Save 10 hours a week",
+      "body": "(example) One client discovered they could save 10 hours a week.",
+      "stat": "10",
+      "stat_label": "hours saved per week",
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "(example) One client discovered they could save 10 hours a week.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "Black couple smiling holding house keys outside new home",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/35184613/pexels-photo-35184613.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Book your free audit",
+      "cta_text": "Book a free 30-min workflow audit",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Ready to see what you can achieve? Book a free 30-min workflow audit today."
+    }
+  ],
+  "voiceover_script": "You're paying people to be robots. Every day, your team spends hours on repetitive tasks that drain your payroll. But there's a better way. Imagine reclaiming that time without hiring anyone new. At Colvin Enterprises, we help businesses like yours streamline operations with our free 30-minute workflow audit. (example) One client discovered they could save 10 hours a week. Ready to see what you can achieve? Book a free 30-min workflow audit today.",
+  "music_direction": "uplifting instrumental",
+  "thumbnail_concept": "A business owner looking inspired while reviewing documents",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Reclaim time and reduce payroll costs. Free audit.",
+  "caption_hook": "Stop paying for robot work",
+  "hashtags": [
+    "#WorkflowEfficiency",
+    "#SmallBizIndy",
+    "#ReclaimTime"
+  ]
+}

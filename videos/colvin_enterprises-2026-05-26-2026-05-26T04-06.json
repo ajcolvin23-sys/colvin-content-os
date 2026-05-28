@@ -1,0 +1,101 @@
+{
+  "video_id": "colvin_enterprises-2026-05-26-2026-05-26T04-06",
+  "created_at": "2026-05-26T04:08:17.438Z",
+  "brand": "colvin_enterprises",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "title": "Stop Paying People to be Robots",
+  "audience": "Small to mid-sized business owners in Indianapolis",
+  "goal": "Encourage bookings for a free workflow audit",
+  "hook": "You're paying people to be robots.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "You're paying people to be robots.",
+      "caption_text": "Stop the waste",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "You're paying people to be robots.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "A business professional looking overwhelmed, stressed, working late at a desk cluttered with papers and a dim lamp light.",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/8468122/pexels-photo-8468122.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-2",
+      "type": "problem",
+      "duration_seconds": 8,
+      "headline": "Wasted time and payroll",
+      "body": "Every day, time and payroll are wasted on repetitive tasks that could be automated.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Every day, time and payroll are wasted on repetitive tasks that could be automated."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "No new hires needed",
+      "body": "But here's the good news: you don't have to hire anyone new to reclaim those hours.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "But here's the good news: you don't have to hire anyone new to reclaim those hours."
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "Imagine the possibilities",
+      "body": "Imagine your team focusing on meaningful work that drives growth.",
+      "stat": null,
+      "stat_label": null,
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "Imagine your team focusing on meaningful work that drives growth.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "A business professional looking relaxed, confident, and successful in a modern office, smiling as they review a well-organized digital dashboard.",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/12871460/pexels-photo-12871460.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Book your free audit",
+      "cta_text": "Book a free 30-min workflow audit",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "Our free 30-minute workflow audit can show you the way. Interested? Book your audit today and transform your business."
+    }
+  ],
+  "voiceover_script": "You're paying people to be robots. Every day, time and payroll are wasted on repetitive tasks that could be automated. But here's the good news: you don't have to hire anyone new to reclaim those hours. Imagine your team focusing on meaningful work that drives growth. By streamlining your processes, you create a more efficient and fulfilled workforce. Our free 30-minute workflow audit can show you the way. Interested? Book your audit today and transform your business.",
+  "music_direction": "uplifting ambient music",
+  "thumbnail_concept": "A stressed worker at a desk with papers, looking overwhelmed.",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Reclaim time and payroll. Book a free workflow audit now.",
+  "caption_hook": "Stop Wasting Payroll",
+  "hashtags": [
+    "#WorkflowOptimization",
+    "#BusinessGrowth",
+    "#IndianapolisBiz"
+  ]
+}

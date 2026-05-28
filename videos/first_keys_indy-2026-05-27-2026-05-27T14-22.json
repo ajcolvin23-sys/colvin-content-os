@@ -1,0 +1,106 @@
+{
+  "video_id": "first_keys_indy-2026-05-27-2026-05-27T14-22",
+  "created_at": "2026-05-27T14:36:41.331Z",
+  "brand": "first_keys_indy",
+  "platform": "tiktok",
+  "format": "9:16",
+  "render_format": "9:16",
+  "composition_id": "FirstKeysAd",
+  "title": "Minority Homebuyer Grant Awareness",
+  "audience": "Minority first-time homebuyers in Marion County, Indianapolis",
+  "goal": "Encourage viewers to check their eligibility for the minority homebuyer grant",
+  "hook": "The down payment isn't the barrier you think it is — not if you live in Marion County.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "type": "hook",
+      "duration_seconds": 3,
+      "headline": "The down payment isn't the barrier you think it is — not if you live in Marion County.",
+      "caption_text": "Homeownership is possible!",
+      "motion": "zoom_in",
+      "transition": "cut",
+      "voiceover": "The down payment isn't the barrier you think it is — not if you live in Marion County.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "Cinematic close-up of a Black woman, worried and exhausted, sitting in a dim apartment — portrait, dramatic side light",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/7193540/pexels-photo-7193540.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-2",
+      "type": "pain",
+      "duration_seconds": 4,
+      "lines": [
+        "Feeling trapped in renting?",
+        "Worried about costs?",
+        "It's time for a change."
+      ],
+      "headline": "Backup headline if lines not used",
+      "motion": "kinetic",
+      "transition": "cut",
+      "voiceover": "Many minority families feel that homeownership is out of reach because of down payment costs."
+    },
+    {
+      "id": "scene-3",
+      "type": "solution",
+      "duration_seconds": 10,
+      "headline": "There's a way to own your home.",
+      "body": "What if I told you there's a grant that can cover your down payment? This program is designed for first-time homebuyers like you, and it doesn’t require repayment.",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "But what if I told you there's a grant that can cover your down payment?"
+    },
+    {
+      "id": "scene-4",
+      "type": "proof",
+      "duration_seconds": 8,
+      "headline": "Real families are making it happen.",
+      "body": "Imagine holding the keys to your new home, not worrying about saving for that down payment. Many families have taken advantage of this opportunity.",
+      "stat": null,
+      "stat_label": null,
+      "motion": "fade",
+      "transition": "fade",
+      "voiceover": "See, many families have taken advantage of this opportunity, moving from rentals to proud homeowners.",
+      "assets": [
+        {
+          "type": "image",
+          "description": "Cinematic portrait of a joyful Black family holding house keys outside their first home, tears of joy, warm golden hour light",
+          "fallback_color": null,
+          "url": "https://images.pexels.com/photos/8470840/pexels-photo-8470840.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+          "source": "pexels"
+        }
+      ]
+    },
+    {
+      "id": "scene-5",
+      "type": "cta",
+      "duration_seconds": 6,
+      "headline": "Take action today!",
+      "cta_text": "See if you qualify — it takes 2 minutes",
+      "motion": "slide_up",
+      "transition": "fade",
+      "voiceover": "If you're ready to take the next step, see if you qualify — it takes just 2 minutes."
+    }
+  ],
+  "voiceover_script": "The down payment isn't the barrier you think it is — not if you live in Marion County. Many minority families feel that homeownership is out of reach because of down payment costs. But what if I told you there's a grant that can cover your down payment? This program is designed for first-time homebuyers like you, and it doesn’t require repayment. Imagine holding the keys to your new home, not worrying about saving for that down payment. See, many families have taken advantage of this opportunity, moving from rentals to proud homeowners. If you're ready to take the next step, see if you qualify — it takes just 2 minutes.",
+  "music_direction": "uplifting acoustic guitar",
+  "thumbnail_concept": "A joyful Black family celebrating outside their new home with keys in hand.",
+  "claims_check": {
+    "risk_level": "low",
+    "issues": [],
+    "reviewed": false
+  },
+  "approval_required": true,
+  "render_status": "draft",
+  "caption": "Discover how a grant can help you own a home in Marion County. It only takes 2 minutes to check your eligibility.",
+  "caption_hook": "Homeownership is within reach",
+  "hashtags": [
+    "#Homeownership",
+    "#IndyRealEstate",
+    "#MinorityHomebuyers"
+  ]
+}

@@ -8,6 +8,16 @@ load: When task type is clear but you need to confirm the right skill path.
 
 Quick reference. For full routing logic see `core/CONTEXT_ROUTER.md`.
 
+## Video Growth (NEW — activate for all video tasks)
+
+| Skill | Load When |
+|---|---|
+| `video-growth-architect` | **Master video skill** — any video script, Remotion build, TikTok/Reels/Shorts, LinkedIn video, ad creative, hook testing, CTA optimization, or video audit. Always load first. |
+| `first-keys-indy-video` | Brand video skill for First Keys Indy — load alongside `video-growth-architect` |
+| `colvin-enterprises-video` | Brand video skill for Colvin Enterprises — load alongside `video-growth-architect` |
+| `music-theory-secrets-video` | Brand video skill for Music Theory Secrets — load alongside `video-growth-architect` |
+| `platform-engagement-research` | Research what's working on TikTok/Reels/Shorts/LinkedIn before major campaign or monthly batch |
+
 ## Website & Content
 
 | Skill | Load When |
@@ -15,7 +25,7 @@ Quick reference. For full routing logic see `core/CONTEXT_ROUTER.md`.
 | `gabriel-cms` | Creating, editing, scheduling, or versioning any website page, section, CTA, blog, or lead magnet |
 | `qa-publish-guard` | Reviewing ANY output before it goes to Alfred or goes live |
 | `website-cro` | Improving a headline, CTA, hero, offer, pricing section, or conversion element |
-| `content-engine` | Creating LinkedIn, Facebook, TikTok, Instagram, YouTube, email, or blog content |
+| `content-engine` | Creating LinkedIn, Facebook, TikTok, Instagram, YouTube, email, or blog content (non-video or simple posts without Remotion) |
 | `design-system-workflow` | Designing or improving a landing page layout, component, or visual system |
 | `experiment-platform-workflow` | Setting up, monitoring, or evaluating an A/B test |
 
@@ -54,8 +64,10 @@ Quick reference. For full routing logic see `core/CONTEXT_ROUTER.md`.
 |---|---|
 | `workflow-debugging` | Diagnosing why a Gabriel workflow, skill, or automation step failed |
 
-## Total Skills: 27
+## Total Skills: 32
 
 _(paper-design-system and humblytics-experiment folders are deprecated. Canonical skills are design-system-workflow and experiment-platform-workflow.)_
 
-Last updated: 2026-05-25
+**Video skill stack added 2026-05-26:** video-growth-architect, first-keys-indy-video, colvin-enterprises-video, music-theory-secrets-video, platform-engagement-research.
+
+Last updated: 2026-05-26

@@ -1,7 +1,15 @@
 // Colvin Content Automation OS — Core Types
 
 export type Platform = 'tiktok' | 'youtube' | 'facebook' | 'linkedin' | 'instagram' | 'multi'
-export type ContentLane = 'piano' | 'backflow' | 'linkedin' | 'colvin_enterprises'
+export type ContentLane =
+  | 'piano'
+  | 'backflow'
+  | 'linkedin'
+  | 'colvin_enterprises'
+  | 'music_theory_secrets'
+  | 'indiana_backflow'
+  | 'first_keys_indy'
+  | 'funding_ready_indiana'
 export type ContentType = 'video' | 'video_script' | 'post' | 'article' | 'carousel' | 'caption' | 'short' | 'reel' | 'outreach' | 'slideshow'
 export type ContentStatus =
   | 'draft'

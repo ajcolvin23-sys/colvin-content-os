@@ -9,11 +9,13 @@
  *   remotion render remotion/index.ts VideoEngine-Vertical --props='{"videoScript": {...}}'
  */
 import React from 'react';
-import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import type { VideoScript } from './types';
 import { getBrand } from './brands';
 import { SceneRenderer } from './SceneRenderer';
 import { CaptionLayer } from './scenes/CaptionLayer';
+import { CinematicGrain } from './components/CinematicGrain';
+import { GlobalProgressBar } from './components/GlobalProgressBar';
 
 // ── Default preview script (shown in Remotion Studio) ────────────────────────
 export const DEFAULT_VIDEO_SCRIPT: VideoScript = {
@@ -128,6 +130,26 @@ export const VideoEngine: React.FC<VideoEngineProps> = ({
           currentFrame={currentFrame}
         />
       )}
+
+      {/* ── Audio tracks ─────────────────────────────────────────────── */}
+      {videoScript.music_url && (
+        <Audio
+          src={staticFile(videoScript.music_url.replace(/^\//, ''))}
+          volume={(videoScript.music_volume ?? 0.18)}
+          startFrom={0}
+        />
+      )}
+      {videoScript.voiceover_url && (
+        <Audio
+          src={staticFile(videoScript.voiceover_url.replace(/^\//, ''))}
+          volume={1.0}
+          startFrom={0}
+        />
+      )}
+
+      {/* ── Global cinematic overlays — composited above all scenes ── */}
+      <CinematicGrain opacity={0.035} />
+      <GlobalProgressBar accentColor={brand.accent_color} />
     </AbsoluteFill>
   );
 };

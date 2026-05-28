@@ -1,12 +1,7 @@
 // ─── Solomon — SEO & Market Authority Agent ───────────────────────────────────
-import OpenAI from 'openai'
+// Reasoning: Claude Opus 4.5 (configured via model-routing.json → 'seo_synthesis')
+import { callClaude } from '@/lib/ai/claude'
 import type { AgentResult } from './types'
-
-let _openai: OpenAI | null = null
-function getOpenAI() {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  return _openai
-}
 
 const SOLOMON_SYSTEM_PROMPT = `You are Solomon — the SEO Authority and Market Domination Agent inside the Colvin Hermes operating system.
 
@@ -65,27 +60,22 @@ Never invent keyword search volumes, competitor stats, or backlink counts withou
 - You optimize for search and AI discoverability. Others write the words.`
 
 export async function runSolomon(task: string, priorContext?: string): Promise<AgentResult> {
-  const openai = getOpenAI()
-
   const userMessage = priorContext
     ? `CONTEXT FROM PRIOR STEP:\n${priorContext}\n\n---\n\nYOUR TASK:\n${task}`
     : task
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: SOLOMON_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0.5,
-      max_tokens: 2000,
+    const result = await callClaude({
+      taskType: 'seo_synthesis',
+      system: SOLOMON_SYSTEM_PROMPT,
+      user: userMessage,
+      agentName: 'solomon',
     })
 
     return {
       agent: 'solomon',
       task,
-      output: response.choices[0].message.content || '',
+      output: result.text,
       success: true,
     }
   } catch (err) {
@@ -94,7 +84,7 @@ export async function runSolomon(task: string, priorContext?: string): Promise<A
       task,
       output: '',
       success: false,
-      error: String(err),
+      error: err instanceof Error ? err.message : String(err),
     }
   }
 }

@@ -18,6 +18,20 @@ Before loading any skill, answer these 7 questions internally:
 
 ## Skill Routing Table
 
+### Video Growth (NEW — always check this section first for video tasks)
+
+| Task Type | Load This Skill |
+|---|---|
+| Any video script, TikTok, Reel, Short, or LinkedIn video | `skills/video-growth-architect` FIRST, then brand skill below |
+| First Keys Indy video, script, or ad | `skills/video-growth-architect` + `skills/first-keys-indy-video` |
+| Colvin Enterprises video, script, or ad | `skills/video-growth-architect` + `skills/colvin-enterprises-video` |
+| Music Theory Secrets video, script, or ad | `skills/video-growth-architect` + `skills/music-theory-secrets-video` |
+| Major campaign (4+ videos) or monthly content batch | `skills/platform-engagement-research` FIRST, then video skills |
+| Hook testing, CTA optimization, or video audit | `skills/video-growth-architect` in Deep Mode |
+| Remotion build or VideoScript JSON | `skills/video-growth-architect` + correct brand skill |
+
+**Video orchestration rule:** See `gabriel-daily-orchestrator.md` → Video Orchestration section.
+
 ### Website & Content (Original Skills)
 
 | Task Type | Load This Skill |
