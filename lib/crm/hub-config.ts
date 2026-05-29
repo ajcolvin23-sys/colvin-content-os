@@ -64,6 +64,33 @@ const DEFAULT_WORKSPACE: HubWorkspaceConfig = {
   widgets: ['next_action', 'top_tasks', 'recent_research', 'pinned_prompts'],
 }
 
+/**
+ * Parent → child relationships. A child hub is a client/engagement of the parent
+ * and does NOT appear in the global niche selector. You only see clients from
+ * inside the parent hub's "Clients" sidebar item.
+ *
+ * Key = child slug, value = parent slug.
+ */
+export const HUB_PARENTS: Record<string, string> = {
+  'urban-legacy-day': 'colvin-enterprises',
+}
+
+/**
+ * Convenience reverse map: parent slug → array of client slugs.
+ */
+export function getClientsOf(parentSlug: string): string[] {
+  return Object.entries(HUB_PARENTS)
+    .filter(([, parent]) => parent === parentSlug)
+    .map(([child]) => child)
+}
+
+/**
+ * Returns true if the given hub is a client of some other hub.
+ */
+export function isClientHub(slug: string): boolean {
+  return slug in HUB_PARENTS
+}
+
 export const HUB_WORKSPACES: Record<string, HubWorkspaceConfig> = {
   'colvin-enterprises': {
     daily_brief: 'Move active opportunities forward. Send what\'s in the outreach queue. Show up for discovery calls.',
@@ -72,6 +99,7 @@ export const HUB_WORKSPACES: Record<string, HubWorkspaceConfig> = {
       { label: 'Outreach Queue', href: '/h/colvin-enterprises/outreach' },
       { label: 'Discovery Calls', href: '/h/colvin-enterprises/calls' },
       { label: 'Proposals', href: '/h/colvin-enterprises/proposals' },
+      { label: 'Clients', href: '/h/colvin-enterprises/clients' },
       { label: 'Won', href: '/h/colvin-enterprises/won' },
       { label: 'Notes', href: '/h/colvin-enterprises/notes' },
     ],
@@ -131,14 +159,15 @@ export const HUB_WORKSPACES: Record<string, HubWorkspaceConfig> = {
   },
 
   'urban-legacy-day': {
-    daily_brief: 'Sponsors first. Registrations second. Logistics third.',
+    daily_brief: 'Colvin Enterprises client engagement. Sponsors first. Registrations second. Logistics third.',
     sidebar: [
       { label: 'Sponsors', href: '/h/urban-legacy-day' },
       { label: 'Registrations', href: '/h/urban-legacy-day/registrations' },
       { label: 'Speakers', href: '/h/urban-legacy-day/speakers' },
       { label: 'Logistics', href: '/h/urban-legacy-day/logistics' },
+      { label: '← Colvin Clients', href: '/h/colvin-enterprises/clients' },
     ],
-    widgets: ['sponsor_pipeline', 'registrations', 'event_countdown'],
+    widgets: ['sponsor_pipeline', 'pending_proposals', 'top_tasks', 'content_calendar'],
   },
 
   'hermes-gabriel': {

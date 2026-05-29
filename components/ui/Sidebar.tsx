@@ -2,7 +2,7 @@
 // then renders the client SidebarNav.
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getActiveHubScope } from '@/lib/crm/hub-scope'
-import { getHubWorkspace, getHubSidebar } from '@/lib/crm/hub-config'
+import { getHubWorkspace, getHubSidebar, isClientHub } from '@/lib/crm/hub-config'
 import SidebarNav from './SidebarNav'
 
 interface HubRow {
@@ -51,9 +51,13 @@ export default async function Sidebar() {
   const hubSidebar = activeHubSlug ? getHubSidebar(activeHubSlug) : undefined
   const hubDailyBrief = activeHubSlug ? workspace.daily_brief : undefined
 
+  // Filter out client hubs (e.g. Urban Legacy Day) from the global niche
+  // selector — they're only accessible from inside their parent's workspace.
+  const selectorHubs = hubs.filter(h => !isClientHub(h.slug))
+
   return (
     <SidebarNav
-      hubs={hubs}
+      hubs={selectorHubs}
       activeScope={scope}
       activeHubSlug={activeHubSlug}
       hubSidebar={hubSidebar}
