@@ -1,9 +1,16 @@
-// ─── AI Content Generation — Claude-First ────────────────────────────────────
+// ─── AI Content Generation — Claude-First + Phase 1-4 Protocol ──────────────
 // Routes by lane and content type. All reasoning goes through Claude
 // (Sonnet for content, Opus for conversion variant scoring, Haiku for outreach).
 // See automation-os/config/model-routing.json for per-task model selection.
+//
+// Content + outreach calls run through runPhasedClaude:
+//   Phase 1 — Free Claude generation
+//   Phase 2 — Haiku trigger scan against TRIGGER_MAP
+//   Phase 3 — Skill-targeted correction (only if triggers fire)
+//   Phase 4 — Locked rules (compliance qualifiers, HUD lender, etc.)
 // ─────────────────────────────────────────────────────────────────────────────
 import { callClaudeJSON } from './claude'
+import { runPhasedClaudeJSON } from './phased-claude'
 import type {
   GenerateContentRequest,
   GenerateVideoScriptRequest,
@@ -94,9 +101,8 @@ export async function generateContent(req: GenerateContentRequest): Promise<{
     multi: 'Multi-platform content. Write a core version that can be adapted.',
   }
 
-  const system = `${ALFRED_VOICE}\n\n${getLaneContext(req.lane)}`
-
-  const user = `TASK: Create a ${req.content_type} for ${req.platform.toUpperCase()}.
+  // Phase 1-4 protocol: Free Claude generation → trigger scan → skill correction → locked rules
+  const task = `Create a ${req.content_type} for ${req.platform.toUpperCase()}.
 Topic: ${req.topic}
 ${req.target_audience ? `Target audience: ${req.target_audience}` : ''}
 ${req.cta ? `CTA: ${req.cta}` : ''}
@@ -115,7 +121,7 @@ Return JSON:
   "visual_direction": "what visual/image/B-roll to use"
 }`
 
-  const { json } = await callClaudeJSON<{
+  const { json } = await runPhasedClaudeJSON<{
     hook?: string
     body?: string
     caption?: string
@@ -124,10 +130,9 @@ Return JSON:
     visual_direction?: string
   }>({
     taskType: 'content_generation',
-    system,
-    user,
+    task,
     lane: req.lane,
-    agentName: 'gabriel-content',
+    additionalContext: getLaneContext(req.lane),
   })
 
   return {
@@ -172,9 +177,7 @@ export async function generateConversionOptimized(
   const platformRules = CONVERSION_RULES[req.platform] || CONVERSION_RULES.multi
   const laneContext = getLaneContext(req.lane)
 
-  const system = `${ALFRED_VOICE}\n\n${laneContext}`
-
-  const user = `TASK: Generate 3 conversion-optimized content variants for ${req.platform.toUpperCase()}.
+  const task = `Generate 3 conversion-optimized content variants for ${req.platform.toUpperCase()}.
 Topic: ${req.topic}
 ${req.target_audience ? `Target audience: ${req.target_audience}` : ''}
 ${req.cta ? `Desired CTA: ${req.cta}` : ''}
@@ -224,16 +227,15 @@ Return JSON:
   "winner_reasoning": "Why this variant will convert best for this topic, platform, and audience. Reference the specific hook mechanism and CTA alignment."
 }`
 
-  const { json: parsed } = await callClaudeJSON<{
+  const { json: parsed } = await runPhasedClaudeJSON<{
     variants?: Record<string, unknown>[]
     winner_index?: number
     winner_reasoning?: string
   }>({
     taskType: 'content_variants',
-    system,
-    user,
+    task,
     lane: req.lane,
-    agentName: 'genius-conversion',
+    additionalContext: laneContext,
   })
 
   // Normalize and validate variants
@@ -366,9 +368,7 @@ export async function generateOutreachDraft(prospect: {
   pain_hypothesis?: string
   offer_fit?: string
 }): Promise<{ connection_request: string; follow_up: string; risk_notes: string }> {
-  const system = `${ALFRED_VOICE}\n${COLVIN_CONTEXT}`
-
-  const user = `TASK: Write a LinkedIn connection request and follow-up for Alfred Colvin.
+  const task = `Write a LinkedIn connection request and follow-up for Alfred Colvin.
 
 Prospect:
 Name: ${prospect.name}
@@ -393,16 +393,15 @@ Return JSON:
   "risk_notes": "anything to verify before sending"
 }`
 
-  const { json: parsed } = await callClaudeJSON<{
+  const { json: parsed } = await runPhasedClaudeJSON<{
     connection_request?: string
     follow_up?: string
     risk_notes?: string
   }>({
     taskType: 'outreach_drafts',
-    system,
-    user,
+    task,
     lane: 'colvin_enterprises',
-    agentName: 'gabriel-outreach',
+    additionalContext: COLVIN_CONTEXT,
   })
 
   return {
