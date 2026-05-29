@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
+/* ─── Hermes Design System — Linear-inspired ─────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Always dark — design only optimizes for dark mode */
+  --bg-canvas: #0a0a0a;
+  --bg-panel: #141414;
+  --bg-elevated: #1a1a1a;
+  --bg-hover: #1f1f1f;
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  --text-primary: #fafafa;
+  --text-body: #a3a3a3;
+  --text-muted: #6b6b6b;
+  --text-dim: #404040;
+
+  /* Single accent — used sparingly */
+  --accent: #7c7cff;
+  --accent-dim: rgba(124, 124, 255, 0.5);
+  --accent-bg: rgba(124, 124, 255, 0.08);
+
+  /* Status colors — quieter than the previous slate-* set */
+  --state-success: #4ade80;
+  --state-warning: #f59e0b;
+  --state-danger: #f87171;
+  --state-info: #7c7cff;
+
+  /* Override Tailwind's default background */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
 }
 
+/* Tailwind v4 theme tokens */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--bg-canvas);
+  --color-panel: var(--bg-panel);
+  --color-elevated: var(--bg-elevated);
+  --color-accent: var(--accent);
+  --color-body: var(--text-body);
+  --color-muted: var(--text-muted);
+  --color-dim: var(--text-dim);
+  --font-sans: -apple-system, "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: -apple-system, "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+}
+
+/* Typographic defaults — type-driven hierarchy */
+h1, h2, h3, h4 {
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* Form controls get the subtle dark treatment */
+input, textarea, select {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  transition: border-color 100ms ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--border-strong);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-dim);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Scrollbars — minimal */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+::selection {
+  background: rgba(124, 124, 255, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

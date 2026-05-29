@@ -1,134 +1,116 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { Hub } from '@/lib/crm/types'
-import { HubCard } from '@/components/hermes/HubCard'
-import { SearchInput } from '@/components/hermes/SearchInput'
-import { FilterBar } from '@/components/hermes/FilterBar'
-import { EmptyState } from '@/components/hermes/EmptyState'
-import { PageHeader } from '@/components/hermes/PageHeader'
-import { HUB_STATUSES, HUB_PRIORITIES } from '@/lib/crm/constants'
-import { LayoutGrid } from 'lucide-react'
 
 interface Props {
   initialHubs: Hub[]
 }
 
+const CATEGORY_ORDER = ['AI Systems', 'Brand', 'Outreach', 'Media', 'Education', 'Community', 'Events', 'Technology', 'Future']
+
 export function HubsClient({ initialHubs }: Props) {
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [seeding, setSeeding] = useState(false)
-  const [seedMsg, setSeedMsg] = useState('')
-
-  const categories = Array.from(new Set(initialHubs.map(h => h.category).filter(Boolean))) as string[]
 
   const filtered = initialHubs.filter(hub => {
-    if (search && !hub.name.toLowerCase().includes(search.toLowerCase()) && !hub.description?.toLowerCase().includes(search.toLowerCase())) return false
-    if (statusFilter && hub.status !== statusFilter) return false
-    if (priorityFilter && hub.priority !== priorityFilter) return false
-    if (categoryFilter && hub.category !== categoryFilter) return false
-    return true
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      hub.name.toLowerCase().includes(q) ||
+      (hub.description ?? '').toLowerCase().includes(q) ||
+      (hub.category ?? '').toLowerCase().includes(q)
+    )
   })
 
-  const handleSeed = async () => {
-    setSeeding(true)
-    setSeedMsg('')
-    try {
-      const res = await fetch('/api/hermes/seed', { method: 'POST' })
-      const data = await res.json()
-      if (res.status === 409) {
-        setSeedMsg('Already seeded. Refresh to see data.')
-      } else if (res.ok) {
-        setSeedMsg(`Seeded: ${data.counts?.hubs} hubs, ${data.counts?.tasks} tasks, ${data.counts?.revenue} revenue ops`)
-        setTimeout(() => window.location.reload(), 1500)
-      } else {
-        setSeedMsg(`Error: ${data.error}`)
-      }
-    } catch (err) {
-      setSeedMsg(`Failed: ${String(err)}`)
-    } finally {
-      setSeeding(false)
-    }
+  // Group by category
+  const byCategory: Record<string, Hub[]> = {}
+  for (const h of filtered) {
+    const cat = h.category ?? 'Other'
+    if (!byCategory[cat]) byCategory[cat] = []
+    byCategory[cat].push(h)
   }
-
-  const activeCount = initialHubs.filter(h => ['Active', 'Revenue Focus'].includes(h.status)).length
-  const buildingCount = initialHubs.filter(h => h.status === 'Building').length
+  const sortedCategories = Object.keys(byCategory).sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a)
+    const bi = CATEGORY_ORDER.indexOf(b)
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  })
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <PageHeader
-        title="Hubs"
-        subtitle={`${initialHubs.length} total · ${activeCount} active · ${buildingCount} building`}
-        action={
-          initialHubs.length === 0 ? (
-            <div className="flex flex-col items-end gap-1">
-              <button
-                onClick={handleSeed}
-                disabled={seeding}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm rounded-lg font-medium transition-colors"
-              >
-                {seeding ? 'Seeding...' : 'Seed All 20 Hubs'}
-              </button>
-              {seedMsg && <span className="text-xs text-slate-400">{seedMsg}</span>}
-            </div>
-          ) : undefined
-        }
-      />
+    <div className="min-h-screen">
+      {/* Header */}
+      <div className="px-10 pt-10 pb-6">
+        <div className="max-w-5xl">
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            Hubs
+          </h1>
+          <p className="text-[13px] mt-1" style={{ color: 'var(--text-body)' }}>
+            {initialHubs.length} business niches · pick one to enter its workspace
+          </p>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="flex-1 max-w-xs">
-          <SearchInput placeholder="Search hubs..." value={search} onChange={setSearch} />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search niches..."
+            className="mt-6 w-full max-w-sm text-[13px]"
+          />
         </div>
-        <FilterBar
-          filters={[
-            { key: 'status', label: 'Status', options: [...HUB_STATUSES], value: statusFilter, onChange: setStatusFilter },
-            { key: 'priority', label: 'Priority', options: [...HUB_PRIORITIES], value: priorityFilter, onChange: setPriorityFilter },
-            { key: 'category', label: 'Category', options: categories, value: categoryFilter, onChange: setCategoryFilter },
-          ]}
-        />
       </div>
 
-      {/* Grid */}
-      {initialHubs.length === 0 ? (
-        <EmptyState
-          icon={LayoutGrid}
-          title="No hubs yet"
-          description="Seed the database to load all 20 business hubs with tasks, research, prompts, and revenue opportunities."
-          action={
-            <div className="flex flex-col items-center gap-2">
-              <button
-                onClick={handleSeed}
-                disabled={seeding}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm rounded-lg font-medium transition-colors"
+      {/* Grouped niches */}
+      <div className="px-10 pb-12">
+        <div className="max-w-5xl space-y-10">
+          {sortedCategories.map(category => (
+            <section key={category}>
+              <h2
+                className="text-[11px] uppercase tracking-widest mb-3"
+                style={{ color: 'var(--text-muted)' }}
               >
-                {seeding ? 'Seeding...' : 'Seed All 20 Hubs'}
-              </button>
-              {seedMsg && <span className="text-xs text-slate-400">{seedMsg}</span>}
-            </div>
-          }
-        />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={LayoutGrid}
-          title="No hubs match filters"
-          description="Try adjusting your search or filter criteria."
-          action={
-            <button onClick={() => { setSearch(''); setStatusFilter(''); setPriorityFilter(''); setCategoryFilter('') }}
-              className="text-xs text-indigo-400 hover:text-indigo-300 underline">
-              Clear filters
-            </button>
-          }
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(hub => (
-            <HubCard key={hub.id} hub={hub} />
+                {category}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {byCategory[category].map(hub => (
+                  <HubRow key={hub.id} hub={hub} />
+                ))}
+              </div>
+            </section>
           ))}
+
+          {filtered.length === 0 && (
+            <div className="py-12 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              No niches match &ldquo;{search}&rdquo;
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
+  )
+}
+
+function HubRow({ hub }: { hub: Hub }) {
+  return (
+    <Link
+      href={`/h/${hub.slug}`}
+      className="block rounded p-3 transition-colors"
+      style={{ background: 'var(--bg-panel)' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elevated)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-panel)' }}
+    >
+      <div className="flex items-center gap-2.5 mb-1.5">
+        <span
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style={{ background: hub.color ?? '#6b6b6b' }}
+        />
+        <span className="text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+          {hub.name}
+        </span>
+      </div>
+      {hub.next_action && (
+        <p className="text-[11px] leading-snug line-clamp-2 ml-4" style={{ color: 'var(--text-muted)' }}>
+          {hub.next_action}
+        </p>
+      )}
+    </Link>
   )
 }

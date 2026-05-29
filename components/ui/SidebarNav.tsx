@@ -2,53 +2,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, LayoutGrid, Users, CheckSquare, DollarSign,
-  Megaphone, FileText, BookOpen, Zap, Workflow, Send,
-  ShieldCheck, Bot, Settings, ChevronRight
+  LayoutGrid, Users, CheckSquare, DollarSign, Megaphone, FileText,
+  BookOpen, Zap, Workflow, Send, ShieldCheck, Bot, Settings,
 } from 'lucide-react'
 import { HubScopeSelector } from '@/components/hermes/HubScopeSelector'
-
-const NAV_GROUPS = [
-  {
-    label: 'Command',
-    items: [
-      { href: '/dashboard', label: 'Command Center', icon: LayoutDashboard },
-      { href: '/hubs', label: 'Hubs', icon: LayoutGrid },
-    ]
-  },
-  {
-    label: 'Pipeline',
-    items: [
-      { href: '/leads', label: 'Leads', icon: Users },
-      { href: '/tasks', label: 'Tasks', icon: CheckSquare },
-      { href: '/revenue', label: 'Revenue', icon: DollarSign },
-      { href: '/campaigns', label: 'Campaigns', icon: Megaphone },
-    ]
-  },
-  {
-    label: 'Content',
-    items: [
-      { href: '/content', label: 'Content', icon: FileText },
-      { href: '/research', label: 'Research', icon: BookOpen },
-      { href: '/prompts', label: 'Prompts', icon: Zap },
-      { href: '/automations', label: 'Automations', icon: Workflow },
-    ]
-  },
-  {
-    label: 'Operations',
-    items: [
-      { href: '/outreach', label: 'Outreach', icon: Send },
-      { href: '/approvals', label: 'Approvals', icon: ShieldCheck },
-      { href: '/agent-logs', label: 'Agent Logs', icon: Bot },
-    ]
-  },
-  {
-    label: 'System',
-    items: [
-      { href: '/settings', label: 'Settings', icon: Settings },
-    ]
-  }
-]
+import type { HubNavItem } from '@/lib/crm/hub-config'
 
 interface HubOption {
   id: string
@@ -60,57 +18,129 @@ interface HubOption {
 interface SidebarNavProps {
   hubs: HubOption[]
   activeScope: string | null
+  activeHubSlug?: string | null
+  hubSidebar?: HubNavItem[]
+  hubDailyBrief?: string
 }
 
-export default function SidebarNav({ hubs, activeScope }: SidebarNavProps) {
+// Global nav — shown when "All hubs" is the scope (no specific niche selected)
+const GLOBAL_NAV = [
+  { href: '/dashboard', label: 'Command Center', icon: LayoutGrid },
+  { href: '/hubs', label: 'All Hubs', icon: LayoutGrid },
+  { href: '/leads', label: 'Leads', icon: Users },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { href: '/revenue', label: 'Revenue', icon: DollarSign },
+  { href: '/campaigns', label: 'Campaigns', icon: Megaphone },
+  { href: '/content', label: 'Content', icon: FileText },
+  { href: '/research', label: 'Research', icon: BookOpen },
+  { href: '/prompts', label: 'Prompts', icon: Zap },
+  { href: '/automations', label: 'Automations', icon: Workflow },
+  { href: '/outreach', label: 'Outreach', icon: Send },
+  { href: '/approvals', label: 'Approvals', icon: ShieldCheck },
+  { href: '/agent-logs', label: 'Agent Logs', icon: Bot },
+  { href: '/settings', label: 'Settings', icon: Settings },
+]
+
+export default function SidebarNav({
+  hubs, activeScope, activeHubSlug, hubSidebar, hubDailyBrief,
+}: SidebarNavProps) {
   const pathname = usePathname()
+  const showHubNav = Boolean(activeScope && hubSidebar && hubSidebar.length > 0)
+  const activeHubColor = hubs.find(h => h.id === activeScope)?.color ?? '#7c7cff'
+
   return (
-    <aside className="hidden md:flex fixed top-0 left-0 h-full w-64 bg-slate-950 border-r border-slate-800/60 flex-col z-50">
-      <div className="px-5 py-5 border-b border-slate-800/60">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
-            <span className="text-indigo-400 text-xs font-bold">H</span>
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-white tracking-tight">Hermes</div>
-            <div className="text-[10px] text-slate-500 tracking-wide">Command CRM</div>
-          </div>
-        </div>
+    <aside
+      className="hidden md:flex fixed top-0 left-0 h-full w-60 flex-col z-50"
+      style={{
+        background: 'var(--bg-canvas)',
+        borderRight: '1px solid var(--border-subtle)',
+      }}
+    >
+      {/* Header */}
+      <div className="px-5 pt-5 pb-4">
+        <div className="text-[13px] font-semibold tracking-tight text-white">Hermes</div>
+        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Command CRM</div>
       </div>
 
-      {/* Persistent niche selector — filters every page globally */}
+      {/* Niche selector */}
       <HubScopeSelector hubs={hubs} initialScope={activeScope} />
 
-      <nav className="flex-1 py-2 overflow-y-auto">
-        {NAV_GROUPS.map(group => (
-          <div key={group.label} className="mb-1">
-            <div className="px-4 py-1.5 text-[10px] font-semibold tracking-widest text-slate-600 uppercase">
-              {group.label}
-            </div>
-            {group.items.map(({ href, label, icon: Icon }) => {
+      {/* Daily brief — visible only when scoped to a niche */}
+      {showHubNav && hubDailyBrief && (
+        <div
+          className="mx-3 mt-1 mb-2 px-3 py-2.5 rounded text-[12px] leading-snug"
+          style={{
+            color: 'var(--text-body)',
+            background: 'var(--bg-panel)',
+            borderLeft: `2px solid ${activeHubColor}`,
+          }}
+        >
+          {hubDailyBrief}
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 px-2 py-2 overflow-y-auto">
+        {showHubNav ? (
+          // Hub-specific nav
+          <div>
+            {hubSidebar!.map(item => {
+              const active = pathname === item.href || pathname.startsWith(item.href + '/')
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center px-3 py-1.5 rounded text-[13px] transition-colors"
+                  style={{
+                    color: active ? 'var(--text-primary)' : 'var(--text-body)',
+                    background: active ? 'var(--bg-panel)' : 'transparent',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-panel)' }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+                >
+                  {item.label}
+                </Link>
+              )
+            })}
+            <div className="my-3" style={{ borderTop: '1px solid var(--border-subtle)' }} />
+            <Link
+              href="/hubs"
+              className="flex items-center px-3 py-1.5 rounded text-[12px]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              ← Back to all hubs
+            </Link>
+          </div>
+        ) : (
+          // Global nav
+          <div>
+            {GLOBAL_NAV.map(({ href, label, icon: Icon }) => {
               const active = pathname === href || pathname.startsWith(href + '/')
               return (
                 <Link
                   key={href}
                   href={href}
-                  className={`mx-2 flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
-                    active
-                      ? 'bg-indigo-500/10 text-indigo-400 font-medium'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                  }`}
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded text-[13px] transition-colors"
+                  style={{
+                    color: active ? 'var(--text-primary)' : 'var(--text-body)',
+                    background: active ? 'var(--bg-panel)' : 'transparent',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-panel)' }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
                 >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="flex-1">{label}</span>
-                  {active && <ChevronRight className="w-3 h-3 opacity-50" />}
+                  <Icon size={14} strokeWidth={1.5} style={{ color: active ? 'var(--text-primary)' : 'var(--text-muted)' }} />
+                  {label}
                 </Link>
               )
             })}
           </div>
-        ))}
+        )}
       </nav>
-      <div className="px-5 py-4 border-t border-slate-800/60">
-        <div className="text-xs font-medium text-slate-300">Alfred Colvin</div>
-        <div className="text-[11px] text-slate-600 mt-0.5">Draft-first · Human approval required</div>
+
+      {/* Footer */}
+      <div className="px-5 py-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Alfred Colvin</div>
+        <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-dim)' }}>Draft-first · approval required</div>
       </div>
     </aside>
   )
