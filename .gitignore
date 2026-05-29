@@ -56,3 +56,8 @@ automation-os/data/campaigns/
 automation-os/data/review-queue/
 automation-os/data/artifacts-latest/
 logs/
+
+# Render artifacts (regenerated daily)
+out/
+videos/*.json
+videos/*.mp4
