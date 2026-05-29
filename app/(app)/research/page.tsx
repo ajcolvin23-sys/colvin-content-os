@@ -1,124 +1,126 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { PageHeader } from '@/components/hermes/PageHeader'
-import { EvidenceBadge } from '@/components/hermes/EvidenceBadge'
-import { EmptyState } from '@/components/hermes/EmptyState'
-import { BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { getActiveHubScope, getHubLabel } from '@/lib/crm/hub-scope'
 
 export const dynamic = 'force-dynamic'
+
+const QUALITY_ORDER = ['Verified', 'Strong Evidence', 'Reasoned Inference', 'Assumption', 'Needs Verification', 'Outdated', 'Contradicted']
+
+const QUALITY_COLOR: Record<string, string> = {
+  'Verified': 'var(--state-success)',
+  'Strong Evidence': 'var(--accent)',
+  'Reasoned Inference': '#7c7cff',
+  'Assumption': 'var(--state-warning)',
+  'Needs Verification': 'var(--state-warning)',
+  'Outdated': 'var(--text-muted)',
+  'Contradicted': 'var(--state-danger)',
+}
 
 async function getResearch(scope: string | null) {
   try {
     const supabase = createAdminClient()
     let query = supabase
       .from('research_notes')
-      .select(`
-        id, title, source, summary, evidence_quality, tags, action_items, created_at,
-        hub_id,
-        hubs!research_notes_hub_id_fkey (id, name, slug, color)
-      `)
+      .select(`id, title, source, summary, evidence_quality, tags, action_items, created_at, hub_id,
+        hubs!research_notes_hub_id_fkey (id, name, slug, color)`)
       .order('created_at', { ascending: false })
     if (scope) query = query.eq('hub_id', scope)
     const { data, error } = await query
     if (error) return []
     return data ?? []
-  } catch {
-    return []
-  }
+  } catch { return [] }
 }
-
-const QUALITY_ORDER = ['Verified', 'Strong Evidence', 'Reasoned Inference', 'Assumption', 'Needs Verification', 'Outdated', 'Contradicted']
 
 export default async function ResearchPage() {
   const scope = await getActiveHubScope()
   const scopeLabel = await getHubLabel(scope)
   const allNotes = await getResearch(scope) as Record<string, unknown>[]
 
-  const verifiedCount = allNotes.filter(n => n.evidence_quality === 'Verified').length
-  const strongCount = allNotes.filter(n => n.evidence_quality === 'Strong Evidence').length
-  const needsVerifCount = allNotes.filter(n => n.evidence_quality === 'Needs Verification').length
-
-  // Sort by evidence quality
   const sorted = [...allNotes].sort((a, b) => {
     const ai = QUALITY_ORDER.indexOf(a.evidence_quality as string)
     const bi = QUALITY_ORDER.indexOf(b.evidence_quality as string)
     return ai - bi
   })
 
+  const counts = QUALITY_ORDER.map(q => ({
+    q,
+    count: allNotes.filter(n => n.evidence_quality === q).length,
+  })).filter(c => c.count > 0)
+
   return (
-    <div className="max-w-5xl mx-auto">
-      <PageHeader
-        title="Research Notes"
-        subtitle={`${scope ? `${scopeLabel} · ` : ''}${allNotes.length} notes · ${verifiedCount} verified · ${strongCount} strong evidence · ${needsVerifCount} needs verification`}
-      />
+    <div className="min-h-screen">
+      <div className="px-10 pt-10 pb-6">
+        <div className="max-w-5xl">
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Research</h1>
+          <p className="text-[13px] mt-1" style={{ color: 'var(--text-body)' }}>
+            {scope ? `${scopeLabel} · ` : ''}{allNotes.length} note{allNotes.length === 1 ? '' : 's'}
+          </p>
 
-      {/* Quality summary bar */}
-      {allNotes.length > 0 && (
-        <div className="flex gap-3 flex-wrap mb-6">
-          {QUALITY_ORDER.map(q => {
-            const count = allNotes.filter(n => n.evidence_quality === q).length
-            if (count === 0) return null
-            return (
-              <div key={q} className="flex items-center gap-2">
-                <EvidenceBadge quality={q} />
-                <span className="text-xs text-slate-500">{count}</span>
-              </div>
-            )
-          })}
+          {counts.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-5">
+              {counts.map(({ q, count }) => (
+                <div key={q} className="flex items-center gap-2 text-[11px]">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: QUALITY_COLOR[q] }} />
+                  <span style={{ color: 'var(--text-body)' }}>{q}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {sorted.length === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title="No research notes"
-          description="Seed the database to load 20 research notes with evidence quality ratings across all hubs."
-        />
-      ) : (
-        <div className="space-y-3">
-          {sorted.map(note => {
-            const hub = note.hubs as Record<string, unknown> | null
-            return (
-              <div key={note.id as string} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
-                <div className="flex items-start gap-3 mb-2">
-                  <EvidenceBadge quality={note.evidence_quality as string} />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-white leading-snug">{note.title as string}</h3>
-                    <div className="flex items-center gap-3 mt-1">
-                      {hub && (
-                        <Link href={`/hubs/${hub.slug}`} className="text-xs text-slate-500 hover:text-indigo-400 transition-colors">
-                          {hub.name as string}
-                        </Link>
-                      )}
-                      {Boolean(note.source) && <span className="text-xs text-slate-600">{note.source as string}</span>}
+      <div className="px-10 pb-12">
+        <div className="max-w-5xl">
+          {sorted.length === 0 ? (
+            <div className="py-12 text-center text-[13px]" style={{ color: 'var(--text-dim)' }}>No research notes yet</div>
+          ) : (
+            <div className="space-y-1">
+              {sorted.map(note => {
+                const hub = note.hubs as Record<string, unknown> | null
+                const quality = note.evidence_quality as string
+                return (
+                  <div key={note.id as string} className="rounded p-4" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ background: QUALITY_COLOR[quality] ?? 'var(--text-muted)' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                          <h3 className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{note.title as string}</h3>
+                          {hub && (
+                            <Link href={`/h/${hub.slug as string}`} className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                              {hub.name as string}
+                            </Link>
+                          )}
+                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{quality}</span>
+                          {Boolean(note.source) && (
+                            <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>{note.source as string}</span>
+                          )}
+                        </div>
+                        {Boolean(note.summary) && (
+                          <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--text-body)' }}>{note.summary as string}</p>
+                        )}
+                        {Boolean(note.action_items) && (
+                          <div className="text-[11px] mt-3 pt-2 leading-relaxed" style={{ color: 'var(--text-body)', borderTop: '1px solid var(--border-subtle)' }}>
+                            <span style={{ color: 'var(--accent)' }}>Action — </span>
+                            {note.action_items as string}
+                          </div>
+                        )}
+                        {Boolean(note.tags) && (note.tags as string[]).length > 0 && (
+                          <div className="flex flex-wrap gap-x-3 mt-3">
+                            {(note.tags as string[]).map(tag => (
+                              <span key={tag} className="text-[10px]" style={{ color: 'var(--text-dim)' }}>#{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {Boolean(note.summary) && (
-                  <p className="text-sm text-slate-400 leading-relaxed mb-3">{note.summary as string}</p>
-                )}
-
-                {Boolean(note.action_items) && (
-                  <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg px-3 py-2 text-xs text-slate-400 mb-3">
-                    <span className="text-indigo-400 font-medium">Action: </span>
-                    {note.action_items as string}
-                  </div>
-                )}
-
-                {Boolean(note.tags) && (note.tags as string[]).length > 0 && (
-                  <div className="flex gap-1 flex-wrap">
-                    {(note.tags as string[]).map(tag => (
-                      <span key={tag} className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded">{tag}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                )
+              })}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

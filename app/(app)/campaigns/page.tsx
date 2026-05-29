@@ -1,31 +1,29 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { PageHeader } from '@/components/hermes/PageHeader'
-import { StatusBadge } from '@/components/hermes/StatusBadge'
-import { EmptyState } from '@/components/hermes/EmptyState'
-import { Megaphone } from 'lucide-react'
 import Link from 'next/link'
 import { getActiveHubScope, getHubLabel } from '@/lib/crm/hub-scope'
 
 export const dynamic = 'force-dynamic'
+
+const STATUS_COLOR: Record<string, string> = {
+  'Planning': 'var(--text-muted)',
+  'Active': 'var(--state-success)',
+  'Paused': 'var(--state-warning)',
+  'Completed': 'var(--text-muted)',
+}
 
 async function getCampaigns(scope: string | null) {
   try {
     const supabase = createAdminClient()
     let query = supabase
       .from('campaigns')
-      .select(`
-        id, name, goal, audience, offer, start_date, end_date, status, metrics, created_at,
-        hub_id,
-        hubs!campaigns_hub_id_fkey (id, name, slug, color)
-      `)
+      .select(`id, name, goal, audience, offer, start_date, end_date, status, metrics, created_at, hub_id,
+        hubs!campaigns_hub_id_fkey (id, name, slug, color)`)
       .order('created_at', { ascending: false })
     if (scope) query = query.eq('hub_id', scope)
     const { data, error } = await query
     if (error) return []
     return data ?? []
-  } catch {
-    return []
-  }
+  } catch { return [] }
 }
 
 export default async function CampaignsPage() {
@@ -34,65 +32,57 @@ export default async function CampaignsPage() {
   const campaigns = await getCampaigns(scope) as Record<string, unknown>[]
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <PageHeader
-        title="Campaigns"
-        subtitle={`${scope ? `${scopeLabel} · ` : ''}${campaigns.length} campaign${campaigns.length === 1 ? '' : 's'}${scope ? '' : ' across all hubs'}`}
-      />
+    <div className="min-h-screen">
+      <div className="px-10 pt-10 pb-6">
+        <div className="max-w-5xl">
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Campaigns</h1>
+          <p className="text-[13px] mt-1" style={{ color: 'var(--text-body)' }}>
+            {scope ? `${scopeLabel} · ` : ''}{campaigns.length} campaign{campaigns.length === 1 ? '' : 's'}
+          </p>
+        </div>
+      </div>
 
-      {campaigns.length === 0 ? (
-        <EmptyState
-          icon={Megaphone}
-          title="No campaigns yet"
-          description="Campaigns will appear here once created. Each hub can have multiple campaigns with goals, audiences, and offers."
-        />
-      ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-800">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Campaign</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">Hub</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Offer</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden xl:table-cell">Dates</th>
-              </tr>
-            </thead>
-            <tbody>
-              {campaigns.map(campaign => {
-                const hub = campaign.hubs as Record<string, unknown> | null
+      <div className="px-10 pb-12">
+        <div className="max-w-5xl">
+          {campaigns.length === 0 ? (
+            <div className="py-12 text-center text-[13px]" style={{ color: 'var(--text-dim)' }}>No campaigns yet</div>
+          ) : (
+            <div className="space-y-1">
+              {campaigns.map(c => {
+                const hub = c.hubs as Record<string, unknown> | null
+                const status = c.status as string
                 return (
-                  <tr key={campaign.id as string} className="border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <div className="text-sm text-slate-200">{campaign.name as string}</div>
-                      {Boolean(campaign.goal) && <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{campaign.goal as string}</div>}
-                      {Boolean(campaign.audience) && <div className="text-xs text-slate-600 mt-0.5">Audience: {campaign.audience as string}</div>}
-                    </td>
-                    <td className="px-4 py-3.5 hidden md:table-cell">
-                      {hub ? (
-                        <Link href={`/hubs/${hub.slug}`} className="text-xs text-slate-400 hover:text-indigo-400 transition-colors">
-                          {hub.name as string}
-                        </Link>
-                      ) : <span className="text-xs text-slate-700">—</span>}
-                    </td>
-                    <td className="px-4 py-3.5 hidden lg:table-cell">
-                      <span className="text-xs text-slate-400 line-clamp-1">{(campaign.offer as string) ?? '—'}</span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <StatusBadge status={campaign.status as string} />
-                    </td>
-                    <td className="px-4 py-3.5 hidden xl:table-cell">
-                      <span className="text-xs text-slate-600">
-                        {campaign.start_date ? `${campaign.start_date} → ${campaign.end_date ?? 'ongoing'}` : '—'}
-                      </span>
-                    </td>
-                  </tr>
+                  <div key={c.id as string} className="rounded p-4" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ background: STATUS_COLOR[status] ?? 'var(--text-muted)' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                          <h3 className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{c.name as string}</h3>
+                          <span className="text-[11px]" style={{ color: STATUS_COLOR[status] ?? 'var(--text-muted)' }}>{status}</span>
+                          {hub && (
+                            <Link href={`/h/${String(hub.slug)}`} className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                              {hub.name as string}
+                            </Link>
+                          )}
+                        </div>
+                        {Boolean(c.goal) && (
+                          <p className="text-[12px] mt-1.5" style={{ color: 'var(--text-body)' }}>{c.goal as string}</p>
+                        )}
+                        <div className="flex flex-wrap gap-x-4 mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          {Boolean(c.audience) && <span>Audience: {c.audience as string}</span>}
+                          {Boolean(c.offer) && <span>Offer: {c.offer as string}</span>}
+                          {Boolean(c.start_date) && <span>Start: {c.start_date as string}</span>}
+                          {Boolean(c.end_date) && <span>End: {c.end_date as string}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

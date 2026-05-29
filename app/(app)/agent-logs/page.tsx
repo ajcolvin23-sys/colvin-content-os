@@ -1,7 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { PageHeader } from '@/components/hermes/PageHeader'
-import { EmptyState } from '@/components/hermes/EmptyState'
-import { Bot, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { getActiveHubScope, getHubLabel } from '@/lib/crm/hub-scope'
 
@@ -12,20 +9,15 @@ async function getAgentLogs(scope: string | null) {
     const supabase = createAdminClient()
     let query = supabase
       .from('hermes_agent_logs')
-      .select(`
-        id, agent_name, action_taken, result, error, confidence_level, human_review_required, created_at,
-        hub_id,
-        hubs!hermes_agent_logs_hub_id_fkey (id, name, slug)
-      `)
+      .select(`id, agent_name, action_taken, result, error, confidence_level, human_review_required, created_at, hub_id,
+        hubs!hermes_agent_logs_hub_id_fkey (id, name, slug)`)
       .order('created_at', { ascending: false })
       .limit(200)
     if (scope) query = query.eq('hub_id', scope)
     const { data, error } = await query
     if (error) return []
     return data ?? []
-  } catch {
-    return []
-  }
+  } catch { return [] }
 }
 
 export default async function AgentLogsPage() {
@@ -37,86 +29,79 @@ export default async function AgentLogsPage() {
   const errorCount = logs.filter(l => l.error).length
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <PageHeader
-        title="Agent Logs"
-        subtitle={`${scope ? `${scopeLabel} · ` : ''}${logs.length} logged actions · ${reviewCount} need review${errorCount > 0 ? ` · ${errorCount} with errors` : ''}`}
-      />
-
-      {logs.length === 0 ? (
-        <EmptyState
-          icon={Bot}
-          title="No agent logs yet"
-          description="Agent logs will appear here as Gabriel and Hermes agents take actions. All agent activity is logged for review."
-        />
-      ) : (
-        <div className="space-y-2">
-          {logs.map(log => {
-            const hub = log.hubs as Record<string, unknown> | null
-            const needsReview = log.human_review_required as boolean
-            const hasError = Boolean(log.error)
-
-            return (
-              <div
-                key={log.id as string}
-                className={`bg-slate-900 border rounded-xl p-4 transition-colors ${
-                  hasError ? 'border-red-500/30 bg-red-500/5' :
-                  needsReview ? 'border-amber-500/30 bg-amber-500/5' :
-                  'border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 flex-shrink-0 ${hasError ? 'text-red-400' : needsReview ? 'text-amber-400' : 'text-slate-600'}`}>
-                    {hasError ? <AlertTriangle className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      {Boolean(log.agent_name) && (
-                        <span className="text-xs font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                          {log.agent_name as string}
-                        </span>
-                      )}
-                      {needsReview && (
-                        <span className="text-xs font-medium text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">Review Required</span>
-                      )}
-                      {Boolean(log.confidence_level) && (
-                        <span className="text-xs text-slate-600">{log.confidence_level as string} confidence</span>
-                      )}
-                      <span className="text-xs text-slate-700 ml-auto">
-                        {new Date(log.created_at as string).toLocaleString('en-US', {
-                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-
-                    {Boolean(log.action_taken) && (
-                      <p className="text-sm text-slate-300 leading-snug mb-1">{log.action_taken as string}</p>
-                    )}
-
-                    {hub && (
-                      <Link href={`/hubs/${String(hub.slug)}`} className="text-xs text-slate-500 hover:text-indigo-400 transition-colors">
-                        {hub.name as string}
-                      </Link>
-                    )}
-
-                    {Boolean(log.result) && (
-                      <div className="mt-2 text-xs text-slate-400 bg-slate-800/50 rounded px-3 py-2 line-clamp-2">
-                        {log.result as string}
-                      </div>
-                    )}
-
-                    {hasError && (
-                      <div className="mt-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
-                        {log.error as string}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+    <div className="min-h-screen">
+      <div className="px-10 pt-10 pb-6">
+        <div className="max-w-5xl">
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Agent Logs</h1>
+          <p className="text-[13px] mt-1" style={{ color: 'var(--text-body)' }}>
+            {scope ? `${scopeLabel} · ` : ''}{logs.length} actions
+            {reviewCount > 0 && <> · <span style={{ color: 'var(--state-warning)' }}>{reviewCount} need review</span></>}
+            {errorCount > 0 && <> · <span style={{ color: 'var(--state-danger)' }}>{errorCount} with errors</span></>}
+          </p>
         </div>
-      )}
+      </div>
+
+      <div className="px-10 pb-12">
+        <div className="max-w-5xl">
+          {logs.length === 0 ? (
+            <div className="py-12 text-center text-[13px]" style={{ color: 'var(--text-dim)' }}>
+              No agent logs yet — they\&apos;ll appear here as Gabriel and Hermes take actions
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {logs.map(log => {
+                const hub = log.hubs as Record<string, unknown> | null
+                const needsReview = Boolean(log.human_review_required)
+                const hasError = Boolean(log.error)
+                const accentColor = hasError ? 'var(--state-danger)' : needsReview ? 'var(--state-warning)' : 'var(--text-muted)'
+                return (
+                  <div key={log.id as string} className="rounded p-4" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ background: accentColor }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {Boolean(log.agent_name) && (
+                            <span className="text-[11px] font-mono" style={{ color: 'var(--text-primary)' }}>
+                              {log.agent_name as string}
+                            </span>
+                          )}
+                          {needsReview && (
+                            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--state-warning)' }}>review required</span>
+                          )}
+                          {Boolean(log.confidence_level) && (
+                            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{log.confidence_level as string} confidence</span>
+                          )}
+                          <span className="text-[10px] ml-auto" style={{ color: 'var(--text-dim)' }}>
+                            {new Date(log.created_at as string).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {Boolean(log.action_taken) && (
+                          <p className="text-[13px] mt-1.5" style={{ color: 'var(--text-primary)' }}>{log.action_taken as string}</p>
+                        )}
+                        {hub && (
+                          <Link href={`/h/${String(hub.slug)}`} className="text-[11px] mt-1 inline-block" style={{ color: 'var(--text-muted)' }}>
+                            {hub.name as string}
+                          </Link>
+                        )}
+                        {Boolean(log.result) && (
+                          <div className="mt-2 text-[11px] line-clamp-2 leading-relaxed" style={{ color: 'var(--text-body)' }}>
+                            {log.result as string}
+                          </div>
+                        )}
+                        {hasError && (
+                          <div className="mt-2 text-[11px] rounded px-3 py-2" style={{ color: 'var(--state-danger)', background: 'rgba(248, 113, 113, 0.05)' }}>
+                            {log.error as string}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

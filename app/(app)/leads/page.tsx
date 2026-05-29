@@ -4,59 +4,38 @@ import { getActiveHubScope } from '@/lib/crm/hub-scope'
 
 export const dynamic = 'force-dynamic'
 
-// Map hub slugs to Gabriel lane keys. The legacy leads table uses `lane` text
-// (e.g. 'colvin_enterprises'), while hubs use slugs (e.g. 'colvin-enterprises').
-// When a hub is selected in the sidebar, translate slug → lane.
 const SLUG_TO_LANE: Record<string, string> = {
   'colvin-enterprises': 'colvin_enterprises',
   'music-theory-secrets': 'music_theory_secrets',
   'indiana-backflow': 'indiana_backflow',
   'first-keys-indy': 'first_keys_indy',
   'funding-ready-indiana': 'funding_ready_indiana',
-  'first-keys-indy-video': 'first_keys_indy',
 }
 
 async function hubScopeToLane(scope: string | null): Promise<string | null> {
   if (!scope) return null
-  // If scope is a UUID, look up the slug; else treat as slug directly
   const supabase = createAdminClient()
   try {
-    const { data } = await supabase
-      .from('hubs')
-      .select('slug')
-      .eq('id', scope)
-      .maybeSingle()
+    const { data } = await supabase.from('hubs').select('slug').eq('id', scope).maybeSingle()
     const slug = data?.slug ?? scope
     return SLUG_TO_LANE[slug] ?? null
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
 const LANE_LABELS: Record<string, string> = {
-  colvin_enterprises: '⚡ Colvin Enterprises',
-  music_theory_secrets: '🎹 Music Theory Secrets',
-  indiana_backflow: '💧 Indiana Backflow',
-  first_keys_indy: '🏠 First Keys Indy',
-  funding_ready_indiana: '💰 Funding Ready',
+  colvin_enterprises: 'Colvin Enterprises',
+  music_theory_secrets: 'Music Theory Secrets',
+  indiana_backflow: 'Indiana Backflow',
+  first_keys_indy: 'First Keys Indy',
+  funding_ready_indiana: 'Funding Ready',
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  new: 'bg-blue-900/50 text-blue-300 border border-blue-700/50',
-  contacted: 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/50',
-  replied: 'bg-purple-900/50 text-purple-300 border border-purple-700/50',
-  converted: 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50',
-  archived: 'bg-gray-800 text-gray-500 border border-gray-700',
-}
-
-function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 8 ? 'text-emerald-400 bg-emerald-950/50 border-emerald-700/50' :
-    score >= 6 ? 'text-yellow-400 bg-yellow-950/50 border-yellow-700/50' :
-    'text-red-400 bg-red-950/50 border-red-700/50'
-  return (
-    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${color}`}>{score}/10</span>
-  )
+const STATUS_COLOR: Record<string, string> = {
+  new: 'var(--accent)',
+  contacted: 'var(--state-warning)',
+  replied: '#a78bfa',
+  converted: 'var(--state-success)',
+  archived: 'var(--text-dim)',
 }
 
 async function getLeads(lane?: string, status?: string) {
@@ -67,10 +46,8 @@ async function getLeads(lane?: string, status?: string) {
     .order('qualification_score', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(200)
-
   if (lane) query = query.eq('lane', lane)
   if (status) query = query.eq('status', status)
-
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return data || []
@@ -78,13 +55,10 @@ async function getLeads(lane?: string, status?: string) {
 
 export default async function LeadsPage({
   searchParams,
-}: {
-  searchParams: Promise<{ lane?: string; status?: string }>
-}) {
+}: { searchParams: Promise<{ lane?: string; status?: string }> }) {
   const params = await searchParams
   const { lane: queryLane, status } = params
 
-  // URL-param lane takes precedence; otherwise inherit from sidebar hub scope
   const scope = await getActiveHubScope()
   const scopedLane = await hubScopeToLane(scope)
   const lane = queryLane ?? scopedLane ?? undefined
@@ -101,127 +75,116 @@ export default async function LeadsPage({
   const statuses = ['new', 'contacted', 'replied', 'converted', 'archived']
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Lead Inbox</h1>
-        <p className="text-gray-400 text-sm mt-1">
-          {leads.length} lead{leads.length !== 1 ? 's' : ''} — sourced by Gabriel, scored and deduplicated.
-          Nothing is contacted without your approval.
-        </p>
-      </div>
+    <div className="min-h-screen">
+      <div className="px-10 pt-10 pb-6">
+        <div className="max-w-5xl">
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Leads</h1>
+          <p className="text-[13px] mt-1" style={{ color: 'var(--text-body)' }}>
+            {leads.length} lead{leads.length === 1 ? '' : 's'} — sourced and scored by Gabriel · nothing is contacted without approval
+          </p>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/leads"
-          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${!lane && !status ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-900 text-gray-400 border-gray-700 hover:border-gray-500'}`}
-        >
-          All
-        </Link>
-        {statuses.map(s => (
-          <Link
-            key={s}
-            href={`/leads?status=${s}${lane ? `&lane=${lane}` : ''}`}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors capitalize ${status === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-900 text-gray-400 border-gray-700 hover:border-gray-500'}`}
-          >
-            {s}
-          </Link>
-        ))}
-        <div className="w-px bg-gray-700 mx-1" />
-        {lanes.map(l => (
-          <Link
-            key={l}
-            href={`/leads?lane=${l}${status ? `&status=${status}` : ''}`}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${lane === l ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-900 text-gray-400 border-gray-700 hover:border-gray-500'}`}
-          >
-            {LANE_LABELS[l] ?? l}
-          </Link>
-        ))}
-      </div>
-
-      {fetchError && (
-        <div className="bg-red-950/30 border border-red-700 rounded-xl p-4 text-red-400 text-sm">
-          Error loading leads: {fetchError}
-        </div>
-      )}
-
-      {leads.length === 0 && !fetchError && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
-          <p className="text-gray-500 text-sm">No leads found for this filter.</p>
-          <p className="text-gray-600 text-xs mt-1">Gabriel adds leads during the daily run at 7 AM CST.</p>
-        </div>
-      )}
-
-      {/* Lead cards */}
-      <div className="space-y-3">
-        {leads.map((lead) => (
-          <div key={lead.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-700 transition-colors">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-white text-sm">{lead.name}</span>
-                  {lead.qualification_score > 0 && (
-                    <ScoreBadge score={lead.qualification_score} />
-                  )}
-                  <span className={`text-xs px-2 py-0.5 rounded ${STATUS_STYLES[lead.status] ?? STATUS_STYLES.new}`}>
-                    {lead.status}
-                  </span>
-                  {lead.lane && (
-                    <span className="text-xs text-gray-500">{LANE_LABELS[lead.lane] ?? lead.lane}</span>
-                  )}
-                </div>
-
-                {(lead.title || lead.company) && (
-                  <p className="text-gray-400 text-xs mt-1">
-                    {[lead.title, lead.company].filter(Boolean).join(' · ')}
-                  </p>
-                )}
-
-                {lead.fit_reason && (
-                  <p className="text-gray-300 text-sm mt-2">{lead.fit_reason}</p>
-                )}
-
-                <div className="flex flex-wrap gap-3 mt-3">
-                  {lead.linkedin_url && (
-                    <a
-                      href={lead.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-400 hover:text-blue-300 underline"
-                    >
-                      LinkedIn →
-                    </a>
-                  )}
-                  {lead.email && (
-                    <span className="text-xs text-gray-400 font-mono">{lead.email}</span>
-                  )}
-                  {lead.source && (
-                    <span className="text-xs text-gray-600">via {lead.source}</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-xs text-gray-600 shrink-0 text-right">
-                {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </div>
-            </div>
-
-            {lead.notes && (
-              <div className="mt-3 pt-3 border-t border-gray-800 text-xs text-gray-500">
-                {lead.notes}
-              </div>
-            )}
-
-            <div className="mt-3 flex gap-2">
-              <Link
-                href={`/outreach?lead_id=${lead.id}`}
-                className="text-xs bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-              >
-                View Outreach Drafts
+          <div className="flex gap-1 mt-5 flex-wrap">
+            <Link href="/leads" className="text-[12px] px-2.5 py-1 rounded transition-colors"
+              style={{ color: !lane && !status ? 'var(--text-primary)' : 'var(--text-body)', background: !lane && !status ? 'var(--bg-elevated)' : 'var(--bg-panel)' }}>
+              All
+            </Link>
+            {statuses.map(s => (
+              <Link key={s} href={`/leads?status=${s}${lane ? `&lane=${lane}` : ''}`}
+                className="text-[12px] px-2.5 py-1 rounded transition-colors capitalize"
+                style={{ color: status === s ? 'var(--text-primary)' : 'var(--text-body)', background: status === s ? 'var(--bg-elevated)' : 'var(--bg-panel)' }}>
+                {s}
               </Link>
-            </div>
+            ))}
+            <span className="mx-2" style={{ borderLeft: '1px solid var(--border-subtle)' }} />
+            {lanes.map(l => (
+              <Link key={l} href={`/leads?lane=${l}${status ? `&status=${status}` : ''}`}
+                className="text-[12px] px-2.5 py-1 rounded transition-colors"
+                style={{ color: lane === l ? 'var(--text-primary)' : 'var(--text-body)', background: lane === l ? 'var(--bg-elevated)' : 'var(--bg-panel)' }}>
+                {LANE_LABELS[l] ?? l}
+              </Link>
+            ))}
           </div>
-        ))}
+        </div>
+      </div>
+
+      <div className="px-10 pb-12">
+        <div className="max-w-5xl">
+          {fetchError && (
+            <div className="rounded px-4 py-3 text-[13px]" style={{ color: 'var(--state-danger)', background: 'rgba(248, 113, 113, 0.05)' }}>
+              Error loading leads: {fetchError}
+            </div>
+          )}
+
+          {leads.length === 0 && !fetchError ? (
+            <div className="py-12 text-center text-[13px]" style={{ color: 'var(--text-dim)' }}>
+              No leads for this filter — Gabriel adds new ones each morning at 7 AM CST
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {leads.map(lead => (
+                <div key={lead.id} className="rounded p-4" style={{ background: 'var(--bg-panel)' }}>
+                  <div className="flex items-start gap-3">
+                    <span className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ background: STATUS_COLOR[lead.status] ?? 'var(--text-muted)' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-3 flex-wrap">
+                        <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{lead.name || lead.company || '—'}</span>
+                        {lead.qualification_score > 0 && (
+                          <span className="text-[11px] tabular-nums" style={{
+                            color: lead.qualification_score >= 8 ? 'var(--state-success)'
+                              : lead.qualification_score >= 6 ? 'var(--state-warning)' : 'var(--state-danger)'
+                          }}>
+                            {lead.qualification_score}/10
+                          </span>
+                        )}
+                        <span className="text-[11px]" style={{ color: STATUS_COLOR[lead.status] ?? 'var(--text-muted)' }}>{lead.status}</span>
+                        {lead.lane && (
+                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                            {LANE_LABELS[lead.lane] ?? lead.lane}
+                          </span>
+                        )}
+                        <span className="text-[10px] ml-auto" style={{ color: 'var(--text-dim)' }}>
+                          {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+
+                      {(lead.title || lead.company) && lead.name && (
+                        <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                          {[lead.title, lead.company].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+
+                      {lead.fit_reason && (
+                        <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--text-body)' }}>{lead.fit_reason}</p>
+                      )}
+
+                      <div className="flex flex-wrap gap-x-4 mt-2 text-[11px]">
+                        {lead.linkedin_url && (
+                          <a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                            LinkedIn →
+                          </a>
+                        )}
+                        {lead.email && <span className="font-mono" style={{ color: 'var(--text-muted)' }}>{lead.email}</span>}
+                        {lead.source && <span style={{ color: 'var(--text-dim)' }}>via {lead.source}</span>}
+                      </div>
+
+                      {lead.notes && (
+                        <p className="text-[11px] mt-2 pt-2 leading-relaxed" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)' }}>
+                          {lead.notes}
+                        </p>
+                      )}
+
+                      <div className="mt-3">
+                        <Link href={`/outreach?lead_id=${lead.id}`} className="text-[11px]" style={{ color: 'var(--accent)' }}>
+                          View outreach drafts →
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
