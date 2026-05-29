@@ -162,6 +162,147 @@ export const HUB_WORKSPACES: Record<string, HubWorkspaceConfig> = {
     ],
     widgets: ['pinned_prompts', 'recent_research'],
   },
+
+  'funding-ready-indiana': {
+    daily_brief: 'Grant readiness audits. Church + nonprofit pipeline. Compliance first.',
+    sidebar: [
+      { label: 'Client Pipeline', href: '/h/funding-ready-indiana' },
+      { label: 'Readiness Audits', href: '/h/funding-ready-indiana/audits' },
+      { label: 'Grant Library', href: '/h/funding-ready-indiana/grants' },
+      { label: 'Compliance', href: '/h/funding-ready-indiana/compliance' },
+    ],
+    widgets: ['pipeline_summary', 'compliance_gate', 'top_tasks', 'recent_research'],
+  },
+
+  'church-nonprofit-ai': {
+    daily_brief: 'Close one church per month. AI ops + financial literacy is the wedge.',
+    sidebar: [
+      { label: 'Client Roster', href: '/h/church-nonprofit-ai' },
+      { label: 'Active Setups', href: '/h/church-nonprofit-ai/setups' },
+      { label: 'Donor Automations', href: '/h/church-nonprofit-ai/donor' },
+      { label: 'Notes', href: '/h/church-nonprofit-ai/notes' },
+    ],
+    widgets: ['pipeline_summary', 'outreach_queue', 'top_tasks', 'pinned_prompts'],
+  },
+
+  'local-biz-automation': {
+    daily_brief: 'Productize. Deploy. Stack template wins.',
+    sidebar: [
+      { label: 'Template Library', href: '/h/local-biz-automation' },
+      { label: 'Deployed Clients', href: '/h/local-biz-automation/clients' },
+      { label: 'Pipeline', href: '/h/local-biz-automation/pipeline' },
+      { label: 'Pricing', href: '/h/local-biz-automation/pricing' },
+    ],
+    widgets: ['pipeline_summary', 'outreach_queue', 'top_tasks', 'pinned_prompts'],
+  },
+
+  'linkedin-outreach': {
+    daily_brief: 'Send today\'s 5 connection requests. Reply to anyone who replied. Book calls.',
+    sidebar: [
+      { label: 'Today\'s Queue', href: '/h/linkedin-outreach' },
+      { label: 'Active Conversations', href: '/h/linkedin-outreach/conversations' },
+      { label: 'Booked Calls', href: '/h/linkedin-outreach/calls' },
+      { label: 'Connection Library', href: '/h/linkedin-outreach/library' },
+    ],
+    widgets: ['outreach_queue', 'next_call', 'weekly_activity', 'pinned_prompts'],
+  },
+
+  'daily-lead-intelligence': {
+    daily_brief: 'Review the 25 leads Gabriel surfaced. Approve top 5 for outreach.',
+    sidebar: [
+      { label: 'Today\'s Leads', href: '/h/daily-lead-intelligence' },
+      { label: 'Scoring Queue', href: '/h/daily-lead-intelligence/scoring' },
+      { label: 'Approved Queue', href: '/h/daily-lead-intelligence/approved' },
+      { label: 'Run Logs', href: '/h/daily-lead-intelligence/logs' },
+    ],
+    widgets: ['daily_run_status', 'outreach_queue', 'top_tasks', 'cost_log'],
+  },
+
+  'gabriel-creative': {
+    daily_brief: 'Generate. Adapt. Distribute. The creative system never stops.',
+    sidebar: [
+      { label: 'Active Campaigns', href: '/h/gabriel-creative' },
+      { label: 'Templates', href: '/h/gabriel-creative/templates' },
+      { label: 'Asset Library', href: '/h/gabriel-creative/assets' },
+      { label: 'Prompts', href: '/h/gabriel-creative/prompts' },
+    ],
+    widgets: ['content_calendar', 'top_tasks', 'pinned_prompts', 'recent_research'],
+  },
+
+  'remotion-video': {
+    daily_brief: 'Render the daily ad for each active brand. Review before publish.',
+    sidebar: [
+      { label: 'Render Queue', href: '/h/remotion-video' },
+      { label: 'Today\'s Renders', href: '/h/remotion-video/today' },
+      { label: 'Templates', href: '/h/remotion-video/templates' },
+      { label: 'Brand Skills', href: '/h/remotion-video/skills' },
+    ],
+    widgets: ['content_calendar', 'content_awaiting_review', 'top_tasks', 'cost_log'],
+  },
+
+  'bible-teaching': {
+    daily_brief: 'Write what you actually teach. One outline at a time.',
+    sidebar: [
+      { label: 'Sermon Outlines', href: '/h/bible-teaching' },
+      { label: 'Scripture Index', href: '/h/bible-teaching/scripture' },
+      { label: 'Publish Queue', href: '/h/bible-teaching/queue' },
+      { label: 'Devotionals', href: '/h/bible-teaching/devotionals' },
+    ],
+    widgets: ['top_tasks', 'content_calendar', 'pinned_prompts', 'recent_research'],
+  },
+
+  'yahweh-comics': {
+    daily_brief: 'Build the Samson world. Canon consistency. Visual fidelity.',
+    sidebar: [
+      { label: 'Story Arcs', href: '/h/yahweh-comics' },
+      { label: 'Character Bible', href: '/h/yahweh-comics/characters' },
+      { label: 'Panel Scripts', href: '/h/yahweh-comics/panels' },
+      { label: 'Canon Notes', href: '/h/yahweh-comics/canon' },
+    ],
+    widgets: ['top_tasks', 'recent_research', 'pinned_prompts', 'next_action'],
+  },
+
+  'girls-got-game': {
+    daily_brief: 'Editorial calendar. Player profiles. Sponsor outreach. Consistency wins.',
+    sidebar: [
+      { label: 'Editorial Calendar', href: '/h/girls-got-game' },
+      { label: 'Player Profiles', href: '/h/girls-got-game/players' },
+      { label: 'Sponsors', href: '/h/girls-got-game/sponsors' },
+      { label: 'Audience', href: '/h/girls-got-game/audience' },
+    ],
+    widgets: ['content_calendar', 'sponsor_pipeline', 'top_tasks', 'pinned_prompts'],
+  },
+
+  'glory-engine-ai': {
+    daily_brief: 'Preset recipes. MVP scope. Sound designer feedback loop.',
+    sidebar: [
+      { label: 'Preset Recipes', href: '/h/glory-engine-ai' },
+      { label: 'MVP Roadmap', href: '/h/glory-engine-ai/roadmap' },
+      { label: 'DSP Notes', href: '/h/glory-engine-ai/dsp' },
+      { label: 'Beta Testers', href: '/h/glory-engine-ai/beta' },
+    ],
+    widgets: ['top_tasks', 'next_action', 'recent_research', 'pinned_prompts'],
+  },
+
+  'comm-eval-engine': {
+    daily_brief: 'Rubric. Sample. Score. Improve. Build the eval, then trust it.',
+    sidebar: [
+      { label: 'Eval Rubric', href: '/h/comm-eval-engine' },
+      { label: 'Sample Scores', href: '/h/comm-eval-engine/samples' },
+      { label: 'Active Clients', href: '/h/comm-eval-engine/clients' },
+      { label: 'Library', href: '/h/comm-eval-engine/library' },
+    ],
+    widgets: ['top_tasks', 'recent_research', 'pinned_prompts', 'cost_log'],
+  },
+
+  'credit-repair-agent': {
+    daily_brief: 'BLOCKED — compliance review required before any build activity.',
+    sidebar: [
+      { label: 'Compliance Review', href: '/h/credit-repair-agent' },
+      { label: 'Notes', href: '/h/credit-repair-agent/notes' },
+    ],
+    widgets: ['next_action', 'recent_research'],
+  },
 }
 
 /**

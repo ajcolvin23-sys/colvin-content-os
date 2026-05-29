@@ -1,9 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { PageHeader } from '@/components/hermes/PageHeader'
-import { StatusBadge } from '@/components/hermes/StatusBadge'
-import { PriorityBadge } from '@/components/hermes/PriorityBadge'
-import { EmptyState } from '@/components/hermes/EmptyState'
-import { CheckSquare } from 'lucide-react'
 import Link from 'next/link'
 import { getActiveHubScope, getHubLabel } from '@/lib/crm/hub-scope'
 
@@ -43,9 +38,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
   const today = new Date().toISOString().split('T')[0]
 
   let tasks = allTasks as Record<string, unknown>[]
-  if (filter === 'overdue') {
-    tasks = tasks.filter(t => t.due_date && (t.due_date as string) < today && t.status !== 'Done')
-  }
+  if (filter === 'overdue') tasks = tasks.filter(t => t.due_date && (t.due_date as string) < today && t.status !== 'Done')
   if (status) tasks = tasks.filter(t => t.status === status)
   if (priority) tasks = tasks.filter(t => t.priority === priority)
 
@@ -55,94 +48,75 @@ export default async function TasksPage({ searchParams }: PageProps) {
     return tt.due_date && (tt.due_date as string) < today && tt.status !== 'Done'
   }).length
 
-  return (
-    <div className="max-w-6xl mx-auto">
-      <PageHeader
-        title="Tasks"
-        subtitle={`${scope ? `${scopeLabel} · ` : ''}${openCount} open · ${overdueCount > 0 ? `${overdueCount} overdue` : 'no overdue'}`}
-      />
+  const filterOptions = [
+    { href: '/tasks', label: 'All' },
+    { href: '/tasks?filter=overdue', label: `Overdue${overdueCount > 0 ? ` · ${overdueCount}` : ''}` },
+    { href: '/tasks?priority=Critical', label: 'Critical' },
+    { href: '/tasks?priority=High', label: 'High' },
+    { href: '/tasks?status=In Progress', label: 'In progress' },
+    { href: '/tasks?status=Blocked', label: 'Blocked' },
+  ]
 
-      {/* Quick filters */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {[
-          { href: '/tasks', label: 'All Open' },
-          { href: '/tasks?filter=overdue', label: `Overdue (${overdueCount})` },
-          { href: '/tasks?priority=Critical', label: 'Critical' },
-          { href: '/tasks?priority=High', label: 'High' },
-          { href: '/tasks?status=In Progress', label: 'In Progress' },
-          { href: '/tasks?status=Blocked', label: 'Blocked' },
-        ].map(({ href, label }) => (
-          <Link
-            key={href}
-            href={href}
-            className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors bg-slate-900"
-          >
-            {label}
-          </Link>
-        ))}
+  return (
+    <div className="min-h-screen">
+      <div className="px-10 pt-10 pb-6">
+        <div className="max-w-5xl">
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Tasks</h1>
+          <p className="text-[13px] mt-1" style={{ color: 'var(--text-body)' }}>
+            {scope ? `${scopeLabel} · ` : ''}{openCount} open{overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}
+          </p>
+
+          <div className="flex gap-1 mt-5 flex-wrap">
+            {filterOptions.map(f => (
+              <Link key={f.href} href={f.href} className="text-[12px] px-2.5 py-1 rounded transition-colors"
+                style={{ color: 'var(--text-body)', background: 'var(--bg-panel)' }}>
+                {f.label}
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {tasks.length === 0 ? (
-        <EmptyState
-          icon={CheckSquare}
-          title="No tasks found"
-          description="Tasks will appear here after seeding the database or creating new tasks."
-        />
-      ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-800">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Task</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">Hub</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Priority</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Due</th>
-              </tr>
-            </thead>
-            <tbody>
+      <div className="px-10 pb-12">
+        <div className="max-w-5xl">
+          {tasks.length === 0 ? (
+            <div className="py-12 text-center text-[13px]" style={{ color: 'var(--text-dim)' }}>
+              No tasks{filter ? ' matching this filter' : ' yet'}
+            </div>
+          ) : (
+            <div className="rounded" style={{ background: 'var(--bg-panel)' }}>
               {tasks.map(task => {
                 const hub = task.hubs as Record<string, unknown> | null
                 const isOverdue = task.due_date && (task.due_date as string) < today && task.status !== 'Done'
                 return (
-                  <tr key={task.id as string} className={`border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors ${isOverdue ? 'bg-red-500/5' : ''}`}>
-                    <td className="px-5 py-3.5">
-                      <div className="text-sm text-slate-200 leading-snug">{task.title as string}</div>
+                  <div key={task.id as string} className="flex items-center gap-4 px-5 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                    {hub && (
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: (hub.color as string) ?? '#6b6b6b' }} />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] truncate" style={{ color: 'var(--text-primary)' }}>{task.title as string}</div>
                       {Boolean(task.next_action) && (
-                        <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{task.next_action as string}</div>
+                        <div className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                          {task.next_action as string}
+                        </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3.5 hidden md:table-cell">
-                      {hub ? (
-                        <Link
-                          href={`/hubs/${hub.slug}`}
-                          className="text-xs text-slate-400 hover:text-indigo-400 transition-colors"
-                          style={{ color: (hub.color as string) ?? undefined }}
-                        >
-                          {hub.name as string}
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-slate-700">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5"><StatusBadge status={task.status as string} /></td>
-                    <td className="px-4 py-3.5"><PriorityBadge priority={task.priority as string} /></td>
-                    <td className="px-4 py-3.5 hidden lg:table-cell">
-                      {task.due_date ? (
-                        <span className={`text-xs ${isOverdue ? 'text-red-400 font-medium' : 'text-slate-500'}`}>
-                          {task.due_date as string}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-700">—</span>
-                      )}
-                    </td>
-                  </tr>
+                    </div>
+                    {hub && (
+                      <Link href={`/h/${hub.slug as string}`} className="text-[11px] hidden md:block" style={{ color: 'var(--text-muted)' }}>
+                        {hub.name as string}
+                      </Link>
+                    )}
+                    <span className="text-[11px] w-20" style={{ color: 'var(--text-muted)' }}>{task.priority as string}</span>
+                    <span className="text-[11px] w-24" style={{ color: isOverdue ? 'var(--state-danger)' : 'var(--text-muted)' }}>
+                      {task.due_date ? new Date((task.due_date as string) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                    </span>
+                  </div>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
