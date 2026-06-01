@@ -1,3 +1,12 @@
+> ⚠️ **HISTORICAL — SUPERSEDED (2026-06-01).** This audit predates the Claude
+> migration and the Hermes CRM build. It describes the OpenAI-era stack and lists
+> blockers that are now resolved. Treat it as a point-in-time record, **not** the
+> current state. As of 2026-06-01: the reasoning core is Claude (Opus/Sonnet/Haiku),
+> OpenAI is fallback-only, memory writes back to Supabase `gabriel_memory` and mirrors
+> to Obsidian, leads/outreach/content save to Supabase, and the weekly-trends +
+> Morning Brief loops are live. For current health, run `npm run health-check` and
+> `npm run self-audit`.
+
 # GABRIEL AGENT LOOP — FULL SYSTEM AUDIT
 **Date:** 2026-05-24  
 **Auditor:** 20-Expert Panel (AI Architect, QA Lead, DevOps, Security, Compliance, Revenue, Growth, Data, Product)  
