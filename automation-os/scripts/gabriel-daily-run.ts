@@ -1060,17 +1060,62 @@ function isBlockedDomain(url: string): boolean {
 
 // ── Lane search query definitions — targets: LinkedIn, Reddit, Facebook, Instagram, TikTok, business sites
 // NOTE: Firecrawl /v1/search does NOT support Google-style site: operators.
+// ── Competitor gate (colvin_enterprises) ────────────────────────────────────
+// Alfred SELLS AI automation. A business that ALSO sells AI automation, web,
+// marketing, or software services is a COMPETITOR, not a prospect — never a lead.
+// This is deterministic so it works even when the LLM scoring step fails to
+// parse (which silently let competitors through before).
+// A real prospect is a business in some OTHER industry that NEEDS automation
+// (a clinic, CPA firm, contractor, retailer) — not a service provider.
+const COMPETITOR_SERVICE_SIGNALS = [
+  /\bai[\s-]?(automation|agency|consult\w*|solution|tool|service|powered|studio)\b/i,
+  /\b(workflow|business process|marketing|sales|email) automation\b/i,
+  /\bautomation (agency|solution|service|platform|company|firm|consult\w*)\b/i,
+  /\b(marketing|digital|creative|web|advertising|seo|branding|software|dev) agency\b/i,
+  /\bweb (design|development)\b/i,
+  /\bsoftware (development|company|house|consult\w*)\b/i,
+  /\b(saas|chatbot|agentic|no[\s-]?code|low[\s-]?code)\b/i,
+  /\bwe (build|create|develop|deliver|help) .*(ai|automation|websites?|apps?|software|bots?)\b/i,
+  /\b(provides?|offers?|builds?|delivers?|specializ\w+|sells?) .*(ai|automation|websites?|software|consulting)\b/i,
+  // Thought-leaders / founders whose own focus IS ai/automation = not buyers
+  /\b(focus\w*|expert\w*|specializ\w*|centered|passion\w*|built around) [^.]*\b(ai|automation)\b/i,
+  /\bfound(er|ed)\b[^.]*\b(ai|automation)\b/i,
+];
+const COMPETITOR_NAME_HINTS = /\b(ai|automat\w*|nexus|agentic|web ?design|digital|software|labs|technolog\w+|consult\w+|solutions|studio|systems)\b/i;
+const COMPETITOR_URL_HINTS = /(\/locations\/(indiana|in)\b|\/industries\/[^/]*(ai|automation)|ai-(automation|consulting)|\/ai-automations?\b)/i;
+
+function isCompetitorLead(
+  lane: string,
+  company: string | null | undefined,
+  title: string | null | undefined,
+  fitReason: string | null | undefined,
+  sourceUrl: string | null | undefined,
+): boolean {
+  if (lane !== 'colvin_enterprises') return false;
+  const hay = `${company ?? ''} ${title ?? ''} ${fitReason ?? ''}`;
+  const sellsServices = COMPETITOR_SERVICE_SIGNALS.some(re => re.test(hay));
+  if (sellsServices) return true;
+  // Vendor-style company name + any service mention in the blurb
+  if (COMPETITOR_NAME_HINTS.test(company ?? '') && /\b(ai|automat|web|market|software|consult|digital)\w*/i.test(hay)) return true;
+  // Vendor-style source URL (location/industry landing pages competitors build)
+  if (sourceUrl && COMPETITOR_URL_HINTS.test(sourceUrl)) return true;
+  return false;
+}
+
 // All queries use plain natural language so Firecrawl's web search returns real results.
 const LANE_SEARCH_QUERIES: Record<string, string[]> = {
   colvin_enterprises: [
-    // AI automation buyers — Indianapolis small business owners
-    'Indianapolis small business owner looking for AI automation tools to save time',
-    // Operations/marketing decision makers
-    'Indianapolis CEO operations director marketing director struggling with manual workflows',
-    // Agency owners open to automation
-    'Indianapolis marketing agency consulting firm founder automating business processes',
-    // Reddit community signals
-    'reddit Indianapolis entrepreneur small business AI tools workflow automation',
+    // BUYERS, not vendors. Never search the category name ("AI automation") —
+    // that returns competitors who SEO for it. Search for the buyer's world:
+    // manual-work pain, hiring signals for clerical roles, ops strain.
+    // Manual-work hiring signals — businesses doing by hand what could be automated
+    'Indianapolis company hiring data entry clerk administrative assistant scheduling coordinator',
+    // Owners voicing operational pain (not vendors selling solutions)
+    'Indianapolis small business owner overwhelmed manual invoicing scheduling paperwork',
+    // Community help-requests from actual buyers
+    'site:reddit.com Indiana small business owner automate repetitive admin tasks spreadsheets',
+    // Growing local firms with operations strain
+    'Indianapolis growing local business hiring operations manager manual process spreadsheet',
   ],
   indiana_backflow: [
     // Property managers needing backflow compliance
@@ -1185,11 +1230,14 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
       // ── CALL A: Extract lead profiles (no scoring — extraction only) ─────────
       // EMAIL EXTRACTION: ask GPT to pull any email visible in the scraped content,
       // and also record source_url so we can scrape it for contact emails.
+      const competitorRule = lane === 'colvin_enterprises'
+        ? `\nCRITICAL — COMPETITOR EXCLUSION: Alfred SELLS AI automation/consulting. EXCLUDE any company that itself sells AI automation, AI consulting, workflow automation, web design, marketing, or software services — those are COMPETITORS, not prospects. A valid prospect is a business in a DIFFERENT industry (clinic, CPA, contractor, retailer, law firm, etc.) that would BUY automation. If the source is a vendor's own landing page, skip it.`
+        : '';
       const extractPrompt = `You are Lead Scout for Alfred Colvin's business "${lane}" in Indianapolis.
 Extract real prospect profiles from the web research below. ONLY use companies and people mentioned in the source material.
 Do NOT invent names. If a real person's name is not mentioned, leave name as null.
 If an email address is visible in the content, include it in the email field. Otherwise leave email as null.
-Do NOT assign quality scores — that is a separate step.
+Do NOT assign quality scores — that is a separate step.${competitorRule}
 Return JSON array. Each item: { name (string|null), company, title (string|null), linkedin_url (string|null), email (string|null), fit_reason, source_url }.
 Max ${config.lead_scout.max_leads_per_lane_per_run} prospects.`;
 
@@ -1207,14 +1255,29 @@ Max ${config.lead_scout.max_leads_per_lane_per_run} prospects.`;
         SKIPPED_LANES.push({ lane, reason: 'JSON parse error on lead extraction' });
         continue;
       }
-      const extracted: Array<{
+      let extracted: Array<{
         name: string|null; company: string; title: string|null;
         linkedin_url: string|null; email: string|null;
         fit_reason: string; source_url: string;
       }> = Array.isArray(extractedRaw) ? extractedRaw : [];
 
+      // ── COMPETITOR GATE ─────────────────────────────────────────────────────
+      // Drop service providers (other AI/automation/web/marketing/software shops)
+      // before they ever reach scoring or outreach. Deterministic — survives a
+      // failed LLM scoring step.
+      {
+        const before = extracted.length;
+        extracted = extracted.filter(
+          l => !isCompetitorLead(lane, l.company, l.title, l.fit_reason, l.source_url)
+        );
+        const dropped = before - extracted.length;
+        if (dropped > 0) {
+          console.log(`  ${lane}: dropped ${dropped} competitor/vendor lead(s) — they sell what Alfred sells, not buyers`);
+        }
+      }
+
       if (extracted.length === 0) {
-        console.log(`  ${lane}: 0 prospects extracted from Firecrawl content`);
+        console.log(`  ${lane}: 0 qualifying prospects after competitor filter`);
         continue;
       }
 
