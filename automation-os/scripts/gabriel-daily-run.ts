@@ -1690,6 +1690,65 @@ function scanForHallucinations(draft: string): string[] {
   return flags;
 }
 
+// ── Cinematic Video Standard Gate (LOCKED UPGRADE 010) ────────────────────────
+// Every short-form video MUST hit the gold-standard cinematic bar before it is
+// saved as a draft. Canonical structure: hook → pain_stack → desire → mechanism
+// → transformation → cta (6 scenes). This gate enforces the non-negotiable shape
+// so the content layer keeps getting BETTER, never drifts back to flat scripts.
+// Returns [] when the script passes, or a list of human-readable failures.
+function validateCinematicStandard(v: {
+  scenes?: Array<{
+    type?: string
+    duration_seconds?: number
+    caption_text?: string
+    motion_direction?: string
+    color_grade?: string
+    assets?: Array<{ description?: string }>
+  }>
+}): string[] {
+  const fails: string[] = [];
+  const scenes = v.scenes ?? [];
+
+  // 1. Scene count — canonical is 6; require at least 5 so a tight cut still passes
+  if (scenes.length < 5) {
+    fails.push(`only ${scenes.length} scenes — cinematic standard needs ≥5 (hook→pain_stack→desire→mechanism→transformation→cta)`);
+  }
+
+  // 2. First scene must be the hook, and must be a fast pattern-interrupt (≤4s)
+  const first = scenes[0];
+  if (!first || first.type !== 'hook') {
+    fails.push('first scene is not a "hook" — every ad opens on the hook');
+  } else if ((first.duration_seconds ?? 99) > 4) {
+    fails.push(`hook is ${first.duration_seconds}s — must be ≤4s pattern interrupt`);
+  }
+
+  // 3. A cta scene must exist (the close that drives action)
+  if (!scenes.some(s => s.type === 'cta')) {
+    fails.push('no "cta" scene — every ad must close on a call to action');
+  }
+
+  // 4. Emotional arc: must move through tension (pain_stack) into payoff (transformation/desire)
+  if (!scenes.some(s => s.type === 'pain_stack')) {
+    fails.push('no "pain_stack" scene — the tension build is required');
+  }
+  if (!scenes.some(s => s.type === 'transformation' || s.type === 'desire')) {
+    fails.push('no "transformation" or "desire" scene — the payoff is required');
+  }
+
+  // 5. Every scene must carry the cinematic production fields
+  scenes.forEach((s, i) => {
+    if (!s.caption_text || !s.caption_text.trim()) fails.push(`scene ${i + 1} (${s.type}) missing caption_text`);
+    if (!s.motion_direction || !s.motion_direction.trim()) fails.push(`scene ${i + 1} (${s.type}) missing motion_direction`);
+    if (!s.color_grade || !s.color_grade.trim()) fails.push(`scene ${i + 1} (${s.type}) missing color_grade`);
+    // Every scene needs an assets[] entry with a description (drives DALL-E 3 fetch-assets)
+    if (!s.assets?.[0]?.description || !s.assets[0].description.trim()) {
+      fails.push(`scene ${i + 1} (${s.type}) missing assets[].description for image generation`);
+    }
+  });
+
+  return fails;
+}
+
 // ── Spam Word Scanner ─────────────────────────────────────────────────────────
 // Flags high-risk spam trigger words in outreach drafts BEFORE they go out.
 // These words get emails filtered by Gmail, Outlook, and corporate spam guards.
@@ -1987,15 +2046,33 @@ Return ONLY valid JSON:
   }
 }`;
 
-        const videoResponse = await callGPT(
-          config.model_routing.content_generation,
-          videoSystem,
-          `Generate the VideoScript JSON for ${targetLane} (${TODAY}). No invented proof.`,
-          { taskType: 'content_generation', lane: targetLane, maxTokens: 1200 }
-        );
-        const vParsed = JSON.parse(videoResponse.replace(/```json|```/g, '').trim());
+        // Generate, then enforce the cinematic standard. Retry ONCE with the
+        // specific failures fed back in if the first draft falls short of the bar.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let vParsed: any = null;
+        let cinematicFails: string[] = ['(not yet generated)'];
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const retryNote = attempt === 0 ? '' : `\n\nYOUR PREVIOUS DRAFT FAILED THE CINEMATIC STANDARD. Fix exactly these issues and return corrected JSON:\n- ${cinematicFails.join('\n- ')}`;
+          const videoResponse = await callGPT(
+            config.model_routing.content_generation,
+            videoSystem,
+            `Generate the VideoScript JSON for ${targetLane} (${TODAY}). No invented proof.${retryNote}`,
+            { taskType: 'content_generation', lane: targetLane, maxTokens: 1200 }
+          );
+          try {
+            vParsed = JSON.parse(videoResponse.replace(/```json|```/g, '').trim());
+          } catch {
+            cinematicFails = ['response was not valid JSON'];
+            continue;
+          }
+          cinematicFails = validateCinematicStandard(vParsed ?? {});
+          if (cinematicFails.length === 0) break;
+          console.log(`  ⚠️  [${targetLane}] video draft failed cinematic standard (attempt ${attempt + 1}): ${cinematicFails.slice(0, 3).join('; ')}`);
+        }
 
-        if (vParsed.scenes?.length > 0 && scanForHallucinations(JSON.stringify(vParsed)).length === 0) {
+        if (cinematicFails.length > 0) {
+          console.log(`  ✗ [${targetLane}] video skipped — did not meet cinematic standard after retry: ${cinematicFails.join('; ')}`);
+        } else if (vParsed && vParsed.scenes?.length > 0 && scanForHallucinations(JSON.stringify(vParsed)).length === 0) {
           // Build full VideoScript object
           const videoScript = {
             video_id: videoId,

@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/weekly-trends",
       "schedule": "0 20 * * 0"
+    },
+    {
+      "path": "/api/cron/weekly-blog",
+      "schedule": "0 14 * * 3"
     }
   ],
   "functions": {
@@ -30,6 +34,9 @@
       "maxDuration": 60
     },
     "app/api/cron/weekly-trends/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/weekly-blog/route.ts": {
       "maxDuration": 300
     }
   }

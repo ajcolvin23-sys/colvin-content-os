@@ -207,6 +207,215 @@ Keep it tight. 400 words max total.`
   }
 }
 
+// ── Vibe Marketing — cross-platform (LinkedIn + Facebook + YouTube) ───────────
+// Alfred's "/last30days for vibe marketing" lane. Pulls live Brave results on how
+// to market on LinkedIn, Facebook, and YouTube RIGHT NOW (last 30 days framing),
+// synthesizes a cross-platform playbook with Claude Opus, and saves it as a
+// research_note on the colvin-enterprises hub so the content layer keeps growing.
+// Real data only — no fabricated stats, no invented view counts.
+async function analyzeVibeMarketing() {
+  console.log(`\n[vibe_marketing] Researching LinkedIn + Facebook + YouTube (last 30 days)...`)
+
+  const queries = [
+    'vibe marketing strategy 2026 what is working now',
+    'best LinkedIn content strategy last 30 days 2026',
+    'Facebook organic reach growth tactics 2026',
+    'YouTube Shorts growth strategy 2026 what works',
+    'short form video hooks going viral this month 2026',
+    'AI content creation marketing trends 2026',
+  ]
+
+  const allResults: BraveResult[] = []
+  for (const q of queries) {
+    const results = await braveSearch(q, 6)
+    console.log(`  "${q.slice(0, 56)}..." → ${results.length} results`)
+    allResults.push(...results)
+  }
+  if (allResults.length === 0) {
+    console.log('  No results — skipping vibe marketing')
+    return
+  }
+
+  const seen = new Set<string>()
+  const uniq = allResults.filter(r => { if (seen.has(r.url)) return false; seen.add(r.url); return true })
+
+  const summaryInput = uniq.slice(0, 36).map((r, i) =>
+    `[${i + 1}] ${r.title}\n    ${r.description}\n    ${r.url}`
+  ).join('\n\n')
+
+  const system = `You are Gabriel's vibe-marketing strategist for Alfred Colvin (Indianapolis AI consultant, multi-lane entrepreneur).
+
+"Vibe marketing" = riding the current cultural/format wave on each platform with authentic, fast, AI-assisted content — not polished corporate ads.
+
+Your job: read raw last-30-days search results about marketing on LinkedIn, Facebook, and YouTube, and turn them into a cross-platform playbook Alfred can act on THIS WEEK to grow his content layer.
+
+DO NOT invent statistics. DO NOT cite view counts, follower numbers, or % lifts unless they literally appear in the raw results. If a number isn't in the results, speak in patterns, not figures.
+
+Return Markdown with these exact sections:
+
+## The vibe right now (cross-platform)
+(2-4 sentences: what's the current content energy/format wave across all three platforms)
+
+## LinkedIn — last 30 days
+(3 bullets: hook formats / post styles working now)
+
+## Facebook — last 30 days
+(3 bullets: what's driving reach/engagement now)
+
+## YouTube — last 30 days
+(3 bullets: Shorts + long-form angles working now)
+
+## Alfred's move this week
+(3 specific, do-it-now actions tailored to his lanes: Colvin Enterprises AI consulting, First Keys Indy, Music Theory Secrets)
+
+## What to avoid
+(played-out / oversaturated / compliance-risky patterns)
+
+## Evidence quality
+Strong Evidence | Reasoned Inference | Assumption — pick one with a one-line justification
+
+Keep it tight. 500 words max total.`
+
+  const result = await anthropic.messages.create({
+    model: 'claude-opus-4-7',
+    max_tokens: 2400,
+    system,
+    messages: [{
+      role: 'user',
+      content: `Platforms: LinkedIn, Facebook, YouTube\nFraming: last 30 days, what's working NOW\n\nRaw search results:\n\n${summaryInput}`
+    }],
+  })
+
+  const analysisText = result.content
+    .filter(b => b.type === 'text')
+    .map(b => (b.type === 'text' ? b.text : ''))
+    .join('')
+
+  const eqMatch = analysisText.match(/## Evidence quality\s*\n+\s*(Strong Evidence|Reasoned Inference|Assumption)/i)
+  const evidenceQuality = eqMatch?.[1] ?? 'Reasoned Inference'
+
+  const { data: hub } = await supabase
+    .from('hubs')
+    .select('id')
+    .eq('slug', 'colvin-enterprises')
+    .maybeSingle()
+
+  if (!hub) {
+    console.log('  No colvin-enterprises hub found — skipping save')
+    return
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+  const { error } = await supabase.from('research_notes').insert({
+    hub_id: hub.id,
+    title: `Vibe marketing — last 30 days — LinkedIn/Facebook/YouTube — ${today}`,
+    source: `Brave Search synthesis (${uniq.length} results across LinkedIn, Facebook, YouTube)`,
+    summary: analysisText,
+    evidence_quality: evidenceQuality,
+    tags: ['vibe_marketing', 'last30days', 'cross_platform', 'linkedin', 'facebook', 'youtube', 'content_growth'],
+    action_items: 'Pull "Alfred\'s move this week" into Monday content gen. Test 1 hook format per platform.',
+  })
+
+  if (error) {
+    console.log(`  Save failed: ${error.message}`)
+  } else {
+    console.log(`  ✅ Saved vibe-marketing research_note (${evidenceQuality})`)
+  }
+}
+
+// ── Weekly Video Review — score recent videos against the gold standard ───────
+// Reads recent video_projects, scores each render_settings JSON against the
+// canonical cinematic rubric (LOCKED UPGRADE 010), and logs a coaching note so
+// short-form quality keeps climbing instead of plateauing. Read-only on videos.
+function scoreCinematic(v: {
+  scenes?: Array<{
+    type?: string; duration_seconds?: number; caption_text?: string
+    motion_direction?: string; color_grade?: string
+    assets?: Array<{ description?: string }>
+  }>
+}): { score: number; max: number; gaps: string[] } {
+  const scenes = v.scenes ?? []
+  const gaps: string[] = []
+  let score = 0
+  const max = 7
+
+  if (scenes.length >= 5) score++; else gaps.push(`only ${scenes.length} scenes (need ≥5)`)
+  if (scenes[0]?.type === 'hook' && (scenes[0]?.duration_seconds ?? 99) <= 4) score++
+  else gaps.push('opening hook missing or >4s')
+  if (scenes.some(s => s.type === 'pain_stack')) score++; else gaps.push('no pain_stack (tension build)')
+  if (scenes.some(s => s.type === 'transformation' || s.type === 'desire')) score++; else gaps.push('no transformation/desire (payoff)')
+  if (scenes.some(s => s.type === 'cta')) score++; else gaps.push('no cta scene')
+  if (scenes.length > 0 && scenes.every(s => s.caption_text?.trim() && s.motion_direction?.trim() && s.color_grade?.trim())) score++
+  else gaps.push('some scenes missing caption_text / motion_direction / color_grade')
+  if (scenes.length > 0 && scenes.every(s => s.assets?.[0]?.description?.trim())) score++
+  else gaps.push('some scenes missing assets[].description for image gen')
+
+  return { score, max, gaps }
+}
+
+async function reviewRecentVideos() {
+  console.log('\n[video_review] Scoring recent videos against the cinematic standard...')
+
+  const since = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString()
+  const { data: videos, error } = await supabase
+    .from('video_projects')
+    .select('id, title, lane, render_settings, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(40)
+
+  if (error) { console.log(`  Query failed: ${error.message}`); return }
+  if (!videos || videos.length === 0) { console.log('  No recent videos to review.'); return }
+
+  const lines: string[] = []
+  let total = 0
+  for (const vid of videos) {
+    const rs = (vid.render_settings ?? {}) as Parameters<typeof scoreCinematic>[0]
+    const { score, max, gaps } = scoreCinematic(rs)
+    total += score / max
+    const flag = score === max ? '✅' : score >= 5 ? '🟡' : '🔴'
+    lines.push(`${flag} ${score}/${max} — ${vid.title ?? vid.id} (${vid.lane ?? '—'})${gaps.length ? `\n    gaps: ${gaps.join('; ')}` : ''}`)
+  }
+  const avgPct = Math.round((total / videos.length) * 100)
+
+  const summary = [
+    `## Weekly video quality review — ${new Date().toISOString().split('T')[0]}`,
+    '',
+    `Reviewed **${videos.length}** videos from the last 8 days against the 6-scene cinematic standard (hook → pain_stack → desire → mechanism → transformation → cta).`,
+    '',
+    `**Average adherence: ${avgPct}%**`,
+    '',
+    '## Per-video scores',
+    ...lines,
+    '',
+    '## Top fixes to lift the standard',
+    avgPct >= 90
+      ? '- Quality is high. Keep the 6-scene structure locked; experiment with bolder hooks.'
+      : '- Enforce the cinematic gate on generation (already wired in gabriel-daily-run). Re-generate any 🔴 below 5/7.',
+  ].join('\n')
+
+  console.log(`  Reviewed ${videos.length} videos — avg adherence ${avgPct}%`)
+
+  const { data: hub } = await supabase
+    .from('hubs')
+    .select('id')
+    .eq('slug', 'colvin-enterprises')
+    .maybeSingle()
+  if (!hub) { console.log('  No colvin-enterprises hub — skipping save'); return }
+
+  const { error: saveErr } = await supabase.from('research_notes').insert({
+    hub_id: hub.id,
+    title: `Video quality review — ${videos.length} videos — ${new Date().toISOString().split('T')[0]}`,
+    source: 'video_projects render_settings scored against LOCKED UPGRADE 010 rubric',
+    summary,
+    evidence_quality: 'Strong Evidence',
+    tags: ['video_review', 'cinematic_standard', 'quality_loop', 'short_form'],
+    action_items: 'Re-generate any video scoring below 5/7. Keep the 6-scene structure locked.',
+  })
+  if (saveErr) console.log(`  Save failed: ${saveErr.message}`)
+  else console.log(`  ✅ Saved video quality review (avg ${avgPct}%)`)
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════════════════════════╗')
   console.log('║         WEEKLY PLATFORM ENGAGEMENT RESEARCH                  ║')
@@ -228,6 +437,20 @@ async function main() {
     } catch (err) {
       console.log(`  ✗ ${lane} failed: ${err instanceof Error ? err.message : String(err)}`)
     }
+  }
+
+  // Cross-platform vibe-marketing research (LinkedIn + Facebook + YouTube, last 30 days)
+  try {
+    await analyzeVibeMarketing()
+  } catch (err) {
+    console.log(`  ✗ vibe_marketing failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // Weekly video quality loop — score recent videos against the cinematic standard
+  try {
+    await reviewRecentVideos()
+  } catch (err) {
+    console.log(`  ✗ video_review failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 
   console.log('\nWeekly trends research complete.')
