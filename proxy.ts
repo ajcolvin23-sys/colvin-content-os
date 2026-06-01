@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // Routes that do NOT require authentication
 const PUBLIC_PATHS = [
   '/login',
+  '/auth/callback', // magic-link / OAuth return — runs BEFORE a session exists, must not be gated
   '/api/health',
   '/_next',
   '/favicon.ico',
