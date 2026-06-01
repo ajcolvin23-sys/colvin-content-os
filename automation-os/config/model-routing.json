@@ -97,10 +97,17 @@
       "max_tokens": 2500,
       "temperature": 0.55
     },
+    "marketing_recs": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "reason": "Conversion + marketing recommendations — needs voice and strategic judgment, Sonnet balances cost/quality",
+      "max_tokens": 2000,
+      "temperature": 0.4
+    },
     "dedup_categorization": {
-      "provider": "openai",
-      "model": "gpt-4o-mini",
-      "reason": "Bulk dedup and categorization where token cost dominates and reasoning is trivial",
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "reason": "Bulk dedup and categorization — Haiku is cheap and accurate; keeps the whole reasoning core on Claude (OpenAI is fallback-only)",
       "max_tokens": 300,
       "temperature": 0.1
     }

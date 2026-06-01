@@ -4,7 +4,7 @@
 // Run: npm run self-audit
 // ─────────────────────────────────────────────────────────────────────────────
 
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -101,14 +101,13 @@ function analyzeOrchestratorCode(): Record<string, { found: boolean; score: numb
 
 // ── AI-assisted audit for semantic holes ─────────────────────────────────────
 async function runAIAuditPass(srcExcerpt: string): Promise<string> {
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  if (!process.env.ANTHROPIC_API_KEY) return 'No AI audit result (ANTHROPIC_API_KEY not set)'
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-  const res = await client.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a multi-agent orchestrator systems auditor. Review this orchestrator TypeScript source and find holes not caught by static analysis.
+  const res = await client.messages.create({
+    model: 'claude-opus-4-7',
+    max_tokens: 800,
+    system: `You are a multi-agent orchestrator systems auditor. Review this orchestrator TypeScript source and find holes not caught by static analysis.
 
 Check for:
 1. Missing business context (are all 9 lanes handled?)
@@ -121,17 +120,15 @@ Check for:
 8. Self-improvement loop (can the system detect and repair its own holes?)
 
 Be specific. List exactly what is missing or weak. Max 10 bullets. No fluff.`,
-      },
+    messages: [
       {
         role: 'user',
         content: `Orchestrator source (first 4000 chars):\n\n${srcExcerpt}`,
       },
     ],
-    temperature: 0.3,
-    max_tokens: 600,
   })
 
-  return res.choices[0].message.content || 'No AI audit result'
+  return res.content.filter(b => b.type === 'text').map(b => (b.type === 'text' ? b.text : '')).join('') || 'No AI audit result'
 }
 
 // ── Main Self-Audit ───────────────────────────────────────────────────────────

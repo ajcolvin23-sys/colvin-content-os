@@ -3,7 +3,7 @@
 // Run: npm run health-check
 // ─────────────────────────────────────────────────────────────────────────────
 
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 
 export interface HealthResult {
   service: string
@@ -12,25 +12,29 @@ export interface HealthResult {
   latency_ms?: number
 }
 
-// ── OpenAI ────────────────────────────────────────────────────────────────────
-async function checkOpenAI(): Promise<HealthResult> {
+// ── Claude (reasoning core) ───────────────────────────────────────────────────
+// Claude is Gabriel's primary reasoning model. OpenAI is fallback-only and is no
+// longer health-checked as a core dependency.
+async function checkClaude(): Promise<HealthResult> {
   const start = Date.now()
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { service: 'Claude (reasoning core)', status: 'error', message: 'ANTHROPIC_API_KEY not set — Gabriel cannot reason' }
+  }
   try {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const res = await client.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: 'Reply with the single word: ONLINE' }],
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const res = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 5,
-      temperature: 0,
+      messages: [{ role: 'user', content: 'Reply with the single word: ONLINE' }],
     })
-    const reply = res.choices[0].message.content?.trim()
+    const reply = res.content.filter(b => b.type === 'text').map(b => (b.type === 'text' ? b.text : '')).join('').trim()
     const latency_ms = Date.now() - start
-    if (reply?.includes('ONLINE')) {
-      return { service: 'OpenAI gpt-4o', status: 'ok', message: 'Responding', latency_ms }
+    if (reply.includes('ONLINE')) {
+      return { service: 'Claude (reasoning core)', status: 'ok', message: 'Responding (Haiku ping)', latency_ms }
     }
-    return { service: 'OpenAI gpt-4o', status: 'warn', message: `Unexpected reply: ${reply}`, latency_ms }
+    return { service: 'Claude (reasoning core)', status: 'warn', message: `Unexpected reply: ${reply}`, latency_ms }
   } catch (err) {
-    return { service: 'OpenAI gpt-4o', status: 'error', message: String(err) }
+    return { service: 'Claude (reasoning core)', status: 'error', message: String(err) }
   }
 }
 
@@ -333,8 +337,8 @@ function checkSocialPlatforms(): HealthResult[] {
 
 // ── Main Health Check Runner ──────────────────────────────────────────────────
 export async function runHealthCheck(): Promise<HealthResult[]> {
-  const [openai, supabase, telegram, composio, firecrawl, playwright, remotion, gemini] = await Promise.all([
-    checkOpenAI(),
+  const [claude, supabase, telegram, composio, firecrawl, playwright, remotion, gemini] = await Promise.all([
+    checkClaude(),
     checkSupabase(),
     checkTelegram(),
     checkComposio(),
@@ -349,7 +353,7 @@ export async function runHealthCheck(): Promise<HealthResult[]> {
   const registryResults = checkRegistryFiles()
 
   return [
-    openai, supabase, telegram, composio,
+    claude, supabase, telegram, composio,
     firecrawl, playwright, remotion, gemini,
     ...socialResults,
     ...orchestratorResults,

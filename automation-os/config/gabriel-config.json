@@ -137,9 +137,10 @@
     "lead_scoring": "claude-haiku-4-5-20251001",
     "outreach_drafts": "claude-sonnet-4-6",
     "seo_synthesis": "claude-opus-4-7",
+    "marketing_recs": "claude-sonnet-4-6",
     "daily_report": "claude-haiku-4-5-20251001",
     "routing_decisions": "claude-haiku-4-5-20251001",
-    "dedup_categorization": "gpt-4o-mini"
+    "dedup_categorization": "claude-haiku-4-5-20251001"
   },
 
   "notifications": {

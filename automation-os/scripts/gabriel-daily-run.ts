@@ -109,6 +109,13 @@ function toDbScore(score: number | null | undefined): number {
 const CONFIG_PATH = path.join(__dirname, '../config/gabriel-config.json');
 const DATA_PATH = path.join(__dirname, '../data');
 
+// Model used to generate content drafts — read once for DB tagging where the
+// per-run `config` object isn't in scope. Mirrors model_routing.content_generation.
+const CONTENT_GEN_MODEL: string = (() => {
+  try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')).model_routing?.content_generation ?? 'claude-sonnet-4-6'; }
+  catch { return 'claude-sonnet-4-6'; }
+})();
+
 // ── Types ────────────────────────────────────────────────────────────────────
 interface LaneStrategy {
   current_rung: string;
@@ -247,10 +254,13 @@ async function withRetry<T>(
 
 // ── AI Usage Logger ───────────────────────────────────────────────────────────
 const COST_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
+  // Claude — the reasoning core (real model names)
+  'claude-opus-4-7':            { input: 15.00, output: 75.00 },
+  'claude-sonnet-4-6':          { input: 3.00,  output: 15.00 },
+  'claude-haiku-4-5-20251001':  { input: 0.80,  output: 4.00  },
+  // OpenAI — fallback only (used if Claude errors out)
   'gpt-4o':           { input: 5.00,  output: 15.00 },
   'gpt-4o-mini':      { input: 0.15,  output: 0.60  },
-  'claude-opus-4-5':  { input: 15.00, output: 75.00 },
-  'claude-haiku-3-5': { input: 0.80,  output: 4.00  },
   'gemini-2.0-flash': { input: 0,     output: 0     }, // free tier
 };
 
@@ -417,7 +427,7 @@ async function callClaude(
   prompt: string,
   opts?: { taskType?: string; lane?: string; model?: string }
 ): Promise<string> {
-  const model = opts?.model || 'claude-haiku-3-5';
+  const model = opts?.model || 'claude-haiku-4-5-20251001';
   try {
     return await callGPT(model, 'You are a helpful assistant.', prompt, {
       taskType: opts?.taskType,
@@ -2162,7 +2172,7 @@ async function step6_solomonSEO(config: GabrielConfig): Promise<SolomonSEOReport
       ).join('\n\n---\n\n');
 
       const solomonAnalysis = await callGPT(
-        'gpt-4o-mini',
+        config.model_routing.seo_synthesis,
         `You are Solomon, Alfred Colvin's SEO intelligence specialist based in Indianapolis, Indiana.
 Analyze real SERP data and give evidence-based recommendations ONLY.
 Never invent keywords or data. Only use what you see in the search results provided.
@@ -2246,7 +2256,7 @@ async function step7_geniusMarketing(
       : 'No SEO data available — make recommendations based on lane context only.';
 
     const response = await callGPT(
-      'gpt-4o-mini',
+      config.model_routing.marketing_recs,
       `You are Genius, Alfred Colvin's marketing and conversion specialist in Indianapolis, Indiana.
 You give specific, doable, low-cost marketing actions. Never vague. Never guaranteed results.
 Never suggest mass outreach or auto-posting. Alfred approves everything before it goes out.
@@ -2562,7 +2572,7 @@ async function step12_saveOutputs(
           hook: firstLine.slice(0, 300),
           body: d.draft,
           status: 'needs_review',
-          generation_model: 'gpt-4o-mini',
+          generation_model: CONTENT_GEN_MODEL,
           created_at: new Date().toISOString(),
         };
       });

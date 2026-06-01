@@ -37,14 +37,17 @@
       "args": ["-y", "@modelcontextprotocol/server-brave-search"],
       "description": "Brave Search — free web search for leads, market research, competitor intel",
       "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+        "BRAVE_API_KEY": "${BRAVE_SEARCH_API_KEY}"
       }
     },
     "obsidian": {
       "command": "npx",
       "args": ["-y", "mcp-obsidian", "/Users/katrinacolvin/Colvin-Hermes-Workspace/obsidian"],
       "description": "Obsidian vault — Gabriel reads/writes memory, SOPs, proposals, daily notes"
-    },
+    }
+  },
+  "_disabled_mcpServers": {
+    "_doc": "google-calendar removed 2026-06-01 — GOOGLE_CLIENT_ID/SECRET are not configured, so the connector failed to start. Re-add to mcpServers above once OAuth creds are set in .env.local.",
     "google-calendar": {
       "command": "npx",
       "args": ["-y", "mcp-google-calendar"],
