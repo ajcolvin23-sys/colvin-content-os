@@ -4,9 +4,30 @@ import { getActiveHubScope, getHubLabel } from '@/lib/crm/hub-scope'
 
 export const dynamic = 'force-dynamic'
 
+// The `leads` table is keyed by `lane` (e.g. music_theory_secrets), not hub_id.
+// The hub scope cookie stores a hub id; resolve it to a lane the way the leads
+// page does so dashboard lead counts stay scoped correctly.
+const SLUG_TO_LANE: Record<string, string> = {
+  'colvin-enterprises': 'colvin_enterprises',
+  'music-theory-secrets': 'music_theory_secrets',
+  'indiana-backflow': 'indiana_backflow',
+  'first-keys-indy': 'first_keys_indy',
+  'funding-ready-indiana': 'funding_ready_indiana',
+}
+
+async function hubScopeToLane(scope: string | null): Promise<string | null> {
+  if (!scope) return null
+  try {
+    const supabase = createAdminClient()
+    const { data } = await supabase.from('hubs').select('slug').eq('id', scope).maybeSingle()
+    const slug = data?.slug ?? scope
+    return SLUG_TO_LANE[slug] ?? null
+  } catch { return null }
+}
+
 interface Hub { id: string; name: string; slug: string; status: string; priority: string; next_action: string | null; color: string | null }
 interface Task { id: string; title: string; status: string; priority: string; due_date: string | null; hub_id: string | null }
-interface Lead { id: string; business_name: string | null; contact_name: string | null; status: string; next_follow_up_date: string | null; hub_id: string | null }
+interface Lead { id: string; name: string | null; company: string | null; status: string; lane: string | null }
 interface Opp { id: string; title: string; amount: number; stage: string; probability: number; hub_id: string | null }
 interface Approval { id: string; title: string | null; risk_level: string; status: string; item_type: string | null; created_at: string }
 interface AgentLog { id: string; agent_name: string | null; action_taken: string | null; human_review_required: boolean; confidence_level: string | null; created_at: string }
@@ -14,13 +35,14 @@ interface AgentLog { id: string; agent_name: string | null; action_taken: string
 async function getDashboardData(scope: string | null) {
   const supabase = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
+  const lane = await hubScopeToLane(scope)
 
   const taskQuery = scope
     ? supabase.from('crm_tasks').select('id, title, status, priority, due_date, hub_id').eq('hub_id', scope).neq('status', 'Done').limit(100)
     : supabase.from('crm_tasks').select('id, title, status, priority, due_date, hub_id').neq('status', 'Done').limit(100)
-  const leadQuery = scope
-    ? supabase.from('leads').select('id, business_name, contact_name, status, next_follow_up_date, hub_id').eq('hub_id', scope).limit(200)
-    : supabase.from('leads').select('id, business_name, contact_name, status, next_follow_up_date, hub_id').limit(200)
+  const leadQuery = lane
+    ? supabase.from('leads').select('id, name, company, status, lane').eq('lane', lane).limit(200)
+    : supabase.from('leads').select('id, name, company, status, lane').limit(200)
   const revenueQuery = scope
     ? supabase.from('revenue_opportunities').select('id, title, amount, stage, probability, hub_id').eq('hub_id', scope).neq('stage', 'Won').neq('stage', 'Lost')
     : supabase.from('revenue_opportunities').select('id, title, amount, stage, probability, hub_id').neq('stage', 'Won').neq('stage', 'Lost')
@@ -36,16 +58,18 @@ async function getDashboardData(scope: string | null) {
     taskQuery, leadQuery, revenueQuery, approvalQuery, agentQuery,
   ])
 
-  const allHubs = (hubs.status === 'fulfilled' ? hubs.value.data : []) as Hub[]
-  const allTasks = (tasks.status === 'fulfilled' ? tasks.value.data : []) as Task[]
-  const allLeads = (leads.status === 'fulfilled' ? leads.value.data : []) as Lead[]
-  const allRevenue = (revenue.status === 'fulfilled' ? revenue.value.data : []) as Opp[]
-  const allApprovals = (approvals.status === 'fulfilled' ? approvals.value.data : []) as Approval[]
-  const allAgentLogs = (agentLogs.status === 'fulfilled' ? agentLogs.value.data : []) as AgentLog[]
+  // NOTE: a fulfilled Supabase query can still carry `data: null` when the query
+  // itself errored (e.g. a column mismatch). The `?? []` guards keep a bad query
+  // from turning into a null-deref render crash (which previously 500'd the page).
+  const allHubs = ((hubs.status === 'fulfilled' ? hubs.value.data : []) ?? []) as Hub[]
+  const allTasks = ((tasks.status === 'fulfilled' ? tasks.value.data : []) ?? []) as Task[]
+  const allLeads = ((leads.status === 'fulfilled' ? leads.value.data : []) ?? []) as Lead[]
+  const allRevenue = ((revenue.status === 'fulfilled' ? revenue.value.data : []) ?? []) as Opp[]
+  const allApprovals = ((approvals.status === 'fulfilled' ? approvals.value.data : []) ?? []) as Approval[]
+  const allAgentLogs = ((agentLogs.status === 'fulfilled' ? agentLogs.value.data : []) ?? []) as AgentLog[]
 
   const overdueTasks = allTasks.filter(t => t.due_date && t.due_date < today)
   const activeHubs = allHubs.filter(h => ['Active', 'Revenue Focus', 'Building'].includes(h.status))
-  const followupsDue = allLeads.filter(l => l.next_follow_up_date && l.next_follow_up_date <= today)
   const pipelineTotal = allRevenue.reduce((s, r) => s + (r.amount ?? 0), 0)
   const weightedTotal = allRevenue.reduce((s, r) => s + ((r.amount ?? 0) * (r.probability ?? 0) / 100), 0)
 
@@ -58,13 +82,13 @@ async function getDashboardData(scope: string | null) {
     activeHubCount: activeHubs.length,
     openTaskCount: allTasks.length,
     overdueTaskCount: overdueTasks.length,
-    activeLeadCount: allLeads.filter(l => !['Won', 'Lost'].includes(l.status)).length,
-    followupsDueCount: followupsDue.length,
+    activeLeadCount: allLeads.filter(l => !['converted', 'archived'].includes(l.status)).length,
+    newLeads: allLeads.filter(l => l.status === 'new').slice(0, 5),
+    newLeadCount: allLeads.filter(l => l.status === 'new').length,
     pipelineTotal,
     weightedTotal,
     pendingApprovalCount: allApprovals.length,
     topTasks, topRevenue, allApprovals, allAgentLogs, criticalHubs,
-    topFollowups: followupsDue.slice(0, 5),
     hubMap: new Map(allHubs.map(h => [h.id, h])),
   }
 }
@@ -99,7 +123,7 @@ export default async function DashboardPage() {
             <Stat label="Open tasks" value={data.openTaskCount} href="/tasks" />
             <Stat label="Overdue" value={data.overdueTaskCount} alert href="/tasks" />
             <Stat label="Active leads" value={data.activeLeadCount} href="/leads" />
-            <Stat label="Follow-ups due" value={data.followupsDueCount} alert href="/leads" />
+            <Stat label="New leads" value={data.newLeadCount} alert href="/leads" />
             <Stat label="Pending review" value={data.pendingApprovalCount} alert href="/approvals" />
           </div>
 
@@ -181,17 +205,17 @@ export default async function DashboardPage() {
 
           </div>
 
-          {/* Follow-ups callout — only if there are some */}
-          {data.topFollowups.length > 0 && (
+          {/* New leads callout — only if there are some */}
+          {data.newLeads.length > 0 && (
             <div className="mt-8 px-5 py-4 rounded" style={{ background: 'var(--bg-panel)', borderLeft: '2px solid var(--state-warning)' }}>
-              <div className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--state-warning)' }}>Follow-ups due</div>
+              <div className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--state-warning)' }}>New leads</div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
-                {data.topFollowups.map(lead => (
+                {data.newLeads.map(lead => (
                   <div key={lead.id} className="flex items-center gap-3 py-1.5">
                     <div className="flex-1 text-[12px] truncate" style={{ color: 'var(--text-primary)' }}>
-                      {lead.business_name || lead.contact_name}
+                      {lead.company || lead.name}
                     </div>
-                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{lead.next_follow_up_date}</div>
+                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{lead.status}</div>
                   </div>
                 ))}
               </div>
