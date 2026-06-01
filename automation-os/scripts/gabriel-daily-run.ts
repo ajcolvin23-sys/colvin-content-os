@@ -1947,7 +1947,7 @@ CTA: "${cta}"
 PHOTO DIRECTION — write cinematic DALL-E 3 descriptions for assets[]:
 ${PHOTO_DIRECTION}
 
-NO fabricated testimonials. NO invented statistics. Label anything hypothetical as (example).
+NO fabricated testimonials. NO invented statistics. NO made-up client stories or case studies. Label anything hypothetical as (example). Describe people in plain language (e.g. "a relieved homeowner", not "a testimonial shot").
 
 Return ONLY valid JSON:
 {
@@ -2057,7 +2057,9 @@ Return ONLY valid JSON:
             config.model_routing.content_generation,
             videoSystem,
             `Generate the VideoScript JSON for ${targetLane} (${TODAY}). No invented proof.${retryNote}`,
-            { taskType: 'content_generation', lane: targetLane, maxTokens: 1200 }
+            // Full 6-scene cinematic JSON (photo directions, steps, pain_points, captions)
+            // does NOT fit in 1200 tokens — it truncated mid-JSON and failed to parse.
+            { taskType: 'content_generation', lane: targetLane, maxTokens: 4000 }
           );
           try {
             vParsed = JSON.parse(videoResponse.replace(/```json|```/g, '').trim());
@@ -2070,9 +2072,36 @@ Return ONLY valid JSON:
           console.log(`  ⚠️  [${targetLane}] video draft failed cinematic standard (attempt ${attempt + 1}): ${cinematicFails.slice(0, 3).join('; ')}`);
         }
 
+        // Run the evidence scan once so we can report WHY a video was dropped,
+        // instead of silently no-op'ing (which made it look like nothing happened).
+        // Scope the scan to AUDIENCE-FACING copy only — what the viewer reads or
+        // hears. Internal production fields (photo/asset directions, claims_check
+        // meta) legitimately contain words like "testimonial-style portrait" that
+        // are not fabricated claims, so scanning the raw JSON over-blocked.
+        const audienceFacingText = (vParsed && vParsed.scenes?.length > 0)
+          ? [
+              vParsed.title, vParsed.caption_hook, vParsed.caption,
+              vParsed.voiceover_script, vParsed.thumbnail_concept,
+              ...(Array.isArray(vParsed.hashtags) ? vParsed.hashtags : []),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ...vParsed.scenes.flatMap((s: any) => [
+                s.headline, s.emphasis, s.caption_text, s.body,
+                s.before_state, s.after_state, s.cta_text,
+                ...(Array.isArray(s.pain_points) ? s.pain_points : []),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ...(Array.isArray(s.steps) ? s.steps.flatMap((st: any) => [st.title, st.description]) : []),
+              ]),
+            ].filter(Boolean).join('\n')
+          : '';
+        const videoHallucinations = (vParsed && vParsed.scenes?.length > 0)
+          ? scanForHallucinations(audienceFacingText)
+          : ['video produced no scenes'];
+
         if (cinematicFails.length > 0) {
           console.log(`  ✗ [${targetLane}] video skipped — did not meet cinematic standard after retry: ${cinematicFails.join('; ')}`);
-        } else if (vParsed && vParsed.scenes?.length > 0 && scanForHallucinations(JSON.stringify(vParsed)).length === 0) {
+        } else if (videoHallucinations.length > 0) {
+          console.log(`  ✗ [${targetLane}] video blocked by evidence scan (passed cinematic gate) — unverified claims: ${videoHallucinations.join('; ')}`);
+        } else {
           // Build full VideoScript object
           const videoScript = {
             video_id: videoId,
