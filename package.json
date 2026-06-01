@@ -21,6 +21,7 @@
     "health-check": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' scripts/health-check.ts",
     "self-audit": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' scripts/self-audit.ts",
     "gabriel:daily": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/gabriel-daily-run.ts",
+    "weekly:trends": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/weekly-trends.ts",
     "render:json": "npx ts-node --project remotion/tsconfig.json scripts/render-video-json.ts",
     "video:new": "echo 'Copy a JSON from /videos/ folder, edit it, then run: npm run render:json -- videos/your-video.json'",
     "setup:db": "node scripts/apply-migration.js supabase/migrations/003_hermes_tables.sql",

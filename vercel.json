@@ -7,6 +7,10 @@
     {
       "path": "/api/daily-video",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-trends",
+      "schedule": "0 20 * * 0"
     }
   ],
   "functions": {
@@ -24,6 +28,9 @@
     },
     "app/api/orchestrator/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/cron/weekly-trends/route.ts": {
+      "maxDuration": 300
     }
   }
 }

@@ -183,6 +183,99 @@ export async function runPhasedClaude(opts: PhasedCallOptions): Promise<PhasedCa
 }
 
 /**
+ * Apply ONLY phases 2-4 to an already-generated draft. Use this when you
+ * already have draft text from another path (e.g. the cron runner's
+ * existing callGPT pipeline) and want to add the trigger scan +
+ * correction + locked rules without re-running generation.
+ *
+ * Returns the cleaned draft and metadata about what fired.
+ *
+ * @example
+ *   const raw = await callGPT(...)
+ *   const { final, triggered } = await applyPhasedPostProcessing(raw, 'colvin_enterprises')
+ *   // save `final` to DB, log `triggered` for telemetry
+ */
+export async function applyPhasedPostProcessing(
+  draft: string,
+  lane?: string,
+  opts?: { skipTriggerScan?: boolean }
+): Promise<{
+  final: string
+  triggered: string[]
+  skillsLoaded: string[]
+  costUsd: number
+  latencyMs: number
+}> {
+  const start = Date.now()
+  if (!draft || draft.length < 30) {
+    return { final: draft, triggered: [], skillsLoaded: [], costUsd: 0, latencyMs: 0 }
+  }
+  let totalCost = 0
+  let current = draft
+
+  if (!opts?.skipTriggerScan) {
+    const triggers = await scanForTriggers(current, lane, 'content_generation')
+    totalCost += triggers.costUsd
+
+    if (triggers.list.length > 0) {
+      const skillsLoaded: string[] = []
+      const skillContextParts: string[] = []
+      const uniqueSkills = new Set(triggers.list.map(t => t.skill).filter(Boolean))
+      for (const skillName of uniqueSkills) {
+        const skill = loadSkill(skillName!)
+        if (skill) {
+          skillContextParts.push(`# Skill: ${skill.name}\n${skill.body.slice(0, 4000)}`)
+          skillsLoaded.push(skillName!)
+        }
+      }
+      const triggerSummary = triggers.list.map(t => `- ${t.condition}: ${t.fix_hint}`).join('\n')
+      const correctionSystem = [
+        buildMinimalSystem(lane),
+        '',
+        '---',
+        '',
+        '# CORRECTION TASK',
+        '',
+        'The draft below was generated freely but triggered specific issues.',
+        'Fix ONLY the flagged issues. Preserve everything else. Do not rewrite from scratch.',
+        '',
+        '## Triggered issues to fix',
+        triggerSummary,
+        ...(skillContextParts.length > 0 ? ['', '## Relevant skill context', ...skillContextParts] : []),
+      ].join('\n')
+
+      const p3 = await callClaude({
+        taskType: 'compliance_review',
+        system: correctionSystem,
+        user: `Original draft:\n\n${current}\n\nReturn the corrected draft ONLY. No commentary, no markdown fences.`,
+        lane,
+        agentName: 'phased-postprocess',
+      })
+      totalCost += p3.costUsd
+      current = p3.text
+      const final = applyLockedRules(current, lane)
+      return {
+        final,
+        triggered: triggers.list.map(t => t.condition),
+        skillsLoaded,
+        costUsd: totalCost,
+        latencyMs: Date.now() - start,
+      }
+    }
+  }
+
+  // No triggers fired → just apply locked rules
+  const final = applyLockedRules(current, lane)
+  return {
+    final,
+    triggered: [],
+    skillsLoaded: [],
+    costUsd: totalCost,
+    latencyMs: Date.now() - start,
+  }
+}
+
+/**
  * Convenience: runPhasedClaude that returns parsed JSON.
  */
 export async function runPhasedClaudeJSON<T = unknown>(opts: PhasedCallOptions): Promise<{
@@ -227,6 +320,19 @@ function buildMinimalSystem(lane?: string, additionalContext?: string): string {
     'You are Gabriel, Alfred Colvin\'s growth operator and content strategist.',
     '',
     ALFRED_VOICE,
+    '',
+    '## Anti-Generic Standard (non-negotiable)',
+    '',
+    'You are writing for someone who refuses to sound like every other AI consultant / housing educator / piano teacher on LinkedIn. Every piece you write must clear these bars:',
+    '',
+    '1. SPECIFIC over abstract — name the number, the time, the place, the person, the dollar. "Saved 4 hours on Mondays" > "saves time"',
+    '2. NEW over template — if you\'ve seen this hook 1,000 times on LinkedIn, do not write it. Forbidden patterns: "Most people will tell you... but here\'s the truth", "3 things X taught me about Y", "Stop doing X. Start doing Y.", "The biggest mistake I see is...", "I\'ve been thinking a lot about...", "Here\'s a hot take:", "Unpopular opinion:", "Let me break this down:"',
+    '3. CONTRADICTION over consensus — Alfred\'s voice argues with the obvious. If the post agrees with mainstream consulting/housing/piano advice, you\'re not adding value',
+    '4. CONCRETE PROOF over vague claim — "We rebuilt invoice routing for a 12-person firm in 6 hours" beats "We help businesses automate workflows"',
+    '5. LOCAL grounding where relevant — Indianapolis / Marion County / Indiana specifics for local lanes',
+    '6. ONE IDEA per post — one hook, one transformation, one CTA. Anything else is dilution',
+    '',
+    'If you cannot meet these bars, write less or write nothing. Generic content damages Alfred\'s positioning more than absence.',
   ]
   if (lane && LANE_IDENTITIES[lane]) {
     parts.push('', '## Current lane', LANE_IDENTITIES[lane])
@@ -253,6 +359,17 @@ const TRIGGER_SCAN_SYSTEM = `You are a fast trigger scanner for Gabriel's Thinki
 
 You read content output and check it against this trigger map:
 
+## ANTI-GENERIC triggers (Alfred's #1 concern — be aggressive here)
+Fire if the output reads like AI-slop / generic LinkedIn / template content:
+- Overused hook patterns: "Most people will tell you... but here's the truth", "3 things X taught me about Y", "Stop doing X. Start doing Y.", "The biggest mistake I see is...", "Hot take:", "Unpopular opinion:", "Let me break this down:", "I've been thinking about..."
+- Zero specifics: vague claims with no number, time, place, person, or dollar
+- Consensus content: agrees with what every other consultant/housing educator/piano teacher says
+- Buzzword stacking: "leverage", "synergies", "holistic", "scalable solutions", "drive value", "thought leader", "game-changer"
+- Generic openers: "In today's [adjective] landscape...", "More than ever before...", "We live in an era where..."
+- Listicle disease: "5 ways to...", "7 reasons why...", "The top 10..."
+- Self-help fluff: "It's not about X, it's about Y" without backing it up
+- Hook is a fact instead of a contradiction or question
+
 ## Compliance triggers
 - Specific dollar guarantees: "you'll save $X", "earn $X more" → fix: "may save", "can help reduce"
 - Absolute outcome promises: "guaranteed leads/results/ROI" → fix: replace with "identify opportunities"
@@ -263,10 +380,9 @@ You read content output and check it against this trigger map:
 - Interest rates / loan terms (always trigger Katrina review)
 
 ## Brand voice triggers
-- Buzzword stacking: "leverage synergies", "holistic paradigm", "scalable solutions"
-- Missing Indianapolis grounding when lane is local
+- Missing Indianapolis grounding when lane is local (first_keys_indy, colvin_enterprises, indiana_backflow)
 - Corporate detachment / third-person distance when Alfred's voice expected
-- Generic openers: "In today's competitive landscape..."
+- No specific outcome named (just abstract benefits)
 
 ## Video structure triggers (only if output is video script)
 - Missing hook in first 3 seconds
@@ -285,7 +401,7 @@ Return JSON:
   ]
 }
 
-Most well-generated outputs trigger 0-1 items. Be honest — don't invent triggers to look thorough. Return { "triggers": [] } if nothing fires.`
+Be aggressive on anti-generic. Be honest on the rest — don't invent triggers to look thorough. Return { "triggers": [] } only if the output is genuinely specific, original, and on-voice.`
 
 async function scanForTriggers(
   output: string,

@@ -32,6 +32,7 @@ import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildGabrielSystemPrelude } from '../../lib/agents/skill-loader';
+import { applyPhasedPostProcessing } from '../../lib/ai/phased-claude';
 
 // ── Environment ─────────────────────────────────────────────────────────────
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -1798,6 +1799,16 @@ Return JSON: { draft: string, character_count: number }`;
       }
 
       if (wantsLinkedIn) {
+        // Phase 2-4 post-processing: trigger scan + targeted fix + locked rules
+        try {
+          const pp = await applyPhasedPostProcessing(liDraft, targetLane);
+          if (pp.triggered.length > 0) {
+            console.log(`  ⊕ ${targetLane} LinkedIn: anti-generic scan triggered [${pp.triggered.join(', ')}] — corrected`);
+            liDraft = pp.final;
+          }
+        } catch (e) {
+          console.log(`  (LinkedIn phased post-processing skipped: ${String(e).slice(0, 80)})`);
+        }
         drafts.push({
           lane: targetLane, platform: 'linkedin', content_type: 'post',
           draft: liDraft, character_count: liDraft.length,

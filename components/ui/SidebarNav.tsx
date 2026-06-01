@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutGrid, Users, CheckSquare, DollarSign, Megaphone, FileText,
-  BookOpen, Zap, Workflow, Send, ShieldCheck, Bot, Settings,
+  BookOpen, Zap, Workflow, Send, ShieldCheck, Bot, Settings, Sunrise,
 } from 'lucide-react'
 import { HubScopeSelector } from '@/components/hermes/HubScopeSelector'
 import type { HubNavItem } from '@/lib/crm/hub-config'
@@ -25,6 +25,7 @@ interface SidebarNavProps {
 
 // Global nav — shown when "All hubs" is the scope (no specific niche selected)
 const GLOBAL_NAV = [
+  { href: '/brief', label: 'Morning Brief', icon: Sunrise },
   { href: '/dashboard', label: 'Command Center', icon: LayoutGrid },
   { href: '/hubs', label: 'All Hubs', icon: LayoutGrid },
   { href: '/leads', label: 'Leads', icon: Users },
