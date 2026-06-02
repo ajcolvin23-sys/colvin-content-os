@@ -1923,14 +1923,17 @@ async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> 
   console.log('\n[Step 5] Generating content drafts — Hook-Story-Offer framework (REVIEW REQUIRED)...');
   const drafts: ContentDraft[] = [];
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  // Per-run variation: changes every run so repeated runs on the same day don't
+  // produce identical hooks/creative. Keyed to the run start minute.
+  const runVariation = Math.floor(RUN_START / 60000);
 
   for (const targetLane of config.active_lanes) {
     const isKatrinaLane = config.compliance.katrina_gate_lanes.includes(targetLane);
     const strategy = config.lane_strategy?.[targetLane];
 
-    // Rotate hooks daily so content stays fresh across platforms
+    // Rotate hooks each run so content stays fresh across platforms and reruns
     const hook = strategy?.hooks?.length
-      ? strategy.hooks[dayOfYear % strategy.hooks.length]
+      ? strategy.hooks[(dayOfYear + runVariation) % strategy.hooks.length]
       : null;
 
     const rungLabel = strategy?.rung_label ?? 'current offer';
@@ -2053,6 +2056,28 @@ Return JSON: { draft: string }`;
       // ── Short-form video (TikTok / Facebook Reels) — generates VideoScript JSON for Remotion ───
       if (wantsTikTok) try {
         const videoId = `${targetLane}-${TODAY}-${RUN_TIMESTAMP}`;
+
+        // ── Same-day duplicate guard ─────────────────────────────────────────
+        // If an unrendered video draft for this lane already exists from today,
+        // skip generating another. Reruns were piling up near-identical drafts
+        // that all rendered (4× "4-Chord Cheat Sheet"). One video per lane/day.
+        try {
+          const { data: existingDraft } = await supabase
+            .from('video_projects')
+            .select('id')
+            .eq('lane', targetLane)
+            .eq('render_status', 'draft')
+            .gte('created_at', `${TODAY}T00:00:00`)
+            .limit(1);
+          if (existingDraft && existingDraft.length > 0) {
+            console.log(`  ⤷ [${targetLane}] video skipped — an unrendered draft already exists for today (no duplicate)`);
+            throw { __skipVideo: true };
+          }
+        } catch (e) {
+          if ((e as { __skipVideo?: boolean })?.__skipVideo) throw e;
+          // query failed — proceed with generation rather than block content
+        }
+
         // ── CINEMATIC 6-SCENE STRUCTURE (LOCKED UPGRADE 010) ─────────────────
         // Uses the new scene types: hook → pain_stack → desire → mechanism → transformation → cta
         // Each scene type maps to a dedicated cinematic Remotion component with
@@ -2252,6 +2277,10 @@ Return ONLY valid JSON:
             hook: hook ?? '',
             scenes: vParsed.scenes,
             voiceover_script: vParsed.voiceover_script ?? '',
+            voiceover_voice: vParsed.voiceover_voice
+              ?? (targetLane === 'first_keys_indy' ? 'nova'
+                : targetLane === 'music_theory_secrets' ? 'fable'
+                : 'echo'),
             music_direction: vParsed.music_direction ?? '',
             thumbnail_concept: vParsed.thumbnail_concept ?? '',
             claims_check: vParsed.claims_check ?? { risk_level: 'low', issues: [], reviewed: false },
@@ -2304,7 +2333,10 @@ Return ONLY valid JSON:
             video_script_id: videoId,
           } as ContentDraft & { katrina_review_required?: boolean; video_script_id?: string });
         }
-      } catch (e) { console.log(`  ${targetLane} video script error: ${String(e).slice(0, 300)}`); }
+      } catch (e) {
+        if ((e as { __skipVideo?: boolean })?.__skipVideo) { /* duplicate guard — already logged */ }
+        else console.log(`  ${targetLane} video script error: ${String(e).slice(0, 300)}`);
+      }
 
       // ── Slide carousel (LinkedIn / Instagram — 5 slides) ─────────────────
       if (wantsLinkedIn) try {

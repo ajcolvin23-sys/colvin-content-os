@@ -122,6 +122,20 @@ function fetchAssetsForVideo(jsonPath: string) {
   }
 }
 
+// ── Generate voiceover + background music before rendering ───────────────────
+// Writes voiceover_url + music_url back into the JSON so the VideoEngine's
+// <Audio> tracks have something to play. Without this every render is silent.
+function generateAudioForVideo(jsonPath: string) {
+  try {
+    execSync(
+      `npx ts-node --project remotion/tsconfig.json scripts/generate-audio.ts "${jsonPath}"`,
+      { cwd: ROOT, stdio: 'inherit' }
+    )
+  } catch (err) {
+    console.log(`  ⚠ Audio generation warning: ${String(err).slice(0, 80)} — rendering without audio`)
+  }
+}
+
 // ── Render one video ──────────────────────────────────────────────────────────
 function renderVideo(videoScript: Record<string, unknown>, videoId: string): string {
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true })
@@ -195,7 +209,16 @@ async function main() {
       if (fs.existsSync(jsonPath)) {
         console.log(`  Fetching images from Pexels...`)
         fetchAssetsForVideo(jsonPath)
-        // Reload videoScript from disk so it has the resolved image URLs
+        console.log(`  Generating voiceover + music...`)
+        generateAudioForVideo(jsonPath)
+        // Reload videoScript from disk so it has the resolved image + audio URLs
+        Object.assign(videoScript, JSON.parse(fs.readFileSync(jsonPath, 'utf8')))
+      } else {
+        // No JSON on disk (DB-only project) — write one so audio/assets can attach
+        fs.mkdirSync(VIDEOS_DIR, { recursive: true })
+        fs.writeFileSync(jsonPath, JSON.stringify(videoScript, null, 2))
+        console.log(`  Generating voiceover + music...`)
+        generateAudioForVideo(jsonPath)
         Object.assign(videoScript, JSON.parse(fs.readFileSync(jsonPath, 'utf8')))
       }
 
