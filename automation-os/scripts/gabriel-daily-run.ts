@@ -1084,6 +1084,50 @@ const COMPETITOR_SERVICE_SIGNALS = [
 const COMPETITOR_NAME_HINTS = /\b(ai|automat\w*|nexus|agentic|web ?design|digital|software|labs|technolog\w+|consult\w+|solutions|studio|systems)\b/i;
 const COMPETITOR_URL_HINTS = /(\/locations\/(indiana|in)\b|\/industries\/[^/]*(ai|automation)|ai-(automation|consulting)|\/ai-automations?\b)/i;
 
+// ── music_theory_secrets ────────────────────────────────────────────────────
+// Alfred SELLS gospel/music-theory education. A BUYER is an individual aspiring
+// pianist, church/worship musician, or choir/music director who wants to improve
+// their OWN playing. Other piano teachers, music schools, instructors, and online
+// course brands are COMPETITORS — never leads.
+const MUSIC_PROVIDER_SIGNALS = [
+  /\b(piano|keyboard|music|gospel)\s+(lessons?|teacher|instructor|tutor|tutoring|academy|school|course|classes?|training|method|masterclass|membership)\b/i,
+  /\b(instructor|teacher|educator|tutor|professor)\b/i,
+  /\bonline\s+(piano|music)\s+(course|lessons?|school|academy)\b/i,
+  /\b(we|our)\s+(teach|offer lessons|train students)\b/i,
+  /\b(enroll(ment)?|subscription|membership site|curriculum|course platform)\b/i,
+];
+const MUSIC_BRAND_HINTS = /\b(pianote|piano ?groove|hear ?and ?play|hearandplay|play ?by ?hear|jmaw|piano with jonny|learn gospel music|god'?s gospel)\b/i;
+
+// ── first_keys_indy ─────────────────────────────────────────────────────────
+// A BUYER is an INDIVIDUAL first-time homebuyer in Marion County who needs
+// down-payment assistance. Mortgage lenders, banks, realtors, government housing
+// agencies, nonprofits, media, and finance-aggregator sites are NOT buyers.
+const HOUSING_INSTITUTION_SIGNALS = [
+  /\b(mortgage|lender|lending|loan officer|bank|credit union|brokerage)\b/i,
+  /\bhousing\s+(authority|finance|partnership|counsel\w*|program|development)\b/i,
+  /\b(community development|development (corp|corporation|authority)|HUD|FHA|FHLB\w*|IHCDA|INHP)\b/i,
+  /\b(realtor|real estate (agent|brokerage|company|firm))\b/i,
+  /\b(department|agency|administration|bureau|federal|municipal|economic development)\b/i,
+  /\b(bankrate|nerdwallet|sofi|rocket mortgage|zillow|redfin|lendingtree)\b/i,
+  /\b(news|media|press|communications officer)\b/i,
+];
+
+// ── funding_ready_indiana ───────────────────────────────────────────────────
+// A BUYER is an INDIVIDUAL small-business owner or nonprofit leader in Indiana
+// who needs help getting funding-ready. Government funding bodies, SBA/SBDC,
+// CDFIs, chambers, banks, lenders, and accounting-software firms are NOT buyers.
+const FUNDING_INSTITUTION_SIGNALS = [
+  /\b(SBA|SBDC|small business administration|small business development center)\b/,
+  /\b(economic development (corp|corporation|council)|IEDC|CDFI|community development financial)\b/i,
+  /\bchamber of commerce\b/i,
+  /\b(bank|credit union|lender|lending|venture (capital|fund)|angel (group|investor)|private equity)\b/i,
+  /\b(department|agency|administration|bureau|state of indiana)\b/i,
+  /\b(quickbooks|intuit|xero|freshbooks|netsuite|accounting software)\b/i,
+  /\b(grant (database|listing|directory|portal|finder)|foundation)\b/i,
+];
+
+const GOV_URL_HINT = /\.gov(\/|$|\b)/i;
+
 function isCompetitorLead(
   lane: string,
   company: string | null | undefined,
@@ -1091,15 +1135,36 @@ function isCompetitorLead(
   fitReason: string | null | undefined,
   sourceUrl: string | null | undefined,
 ): boolean {
-  if (lane !== 'colvin_enterprises') return false;
   const hay = `${company ?? ''} ${title ?? ''} ${fitReason ?? ''}`;
-  const sellsServices = COMPETITOR_SERVICE_SIGNALS.some(re => re.test(hay));
-  if (sellsServices) return true;
-  // Vendor-style company name + any service mention in the blurb
-  if (COMPETITOR_NAME_HINTS.test(company ?? '') && /\b(ai|automat|web|market|software|consult|digital)\w*/i.test(hay)) return true;
-  // Vendor-style source URL (location/industry landing pages competitors build)
-  if (sourceUrl && COMPETITOR_URL_HINTS.test(sourceUrl)) return true;
-  return false;
+  const url = sourceUrl ?? '';
+
+  switch (lane) {
+    case 'colvin_enterprises': {
+      if (COMPETITOR_SERVICE_SIGNALS.some(re => re.test(hay))) return true;
+      // Vendor-style company name + any service mention in the blurb
+      if (COMPETITOR_NAME_HINTS.test(company ?? '') && /\b(ai|automat|web|market|software|consult|digital)\w*/i.test(hay)) return true;
+      // Vendor-style source URL (location/industry landing pages competitors build)
+      if (COMPETITOR_URL_HINTS.test(url)) return true;
+      return false;
+    }
+    case 'music_theory_secrets': {
+      if (MUSIC_BRAND_HINTS.test(company ?? '')) return true;
+      if (MUSIC_PROVIDER_SIGNALS.some(re => re.test(hay))) return true;
+      return false;
+    }
+    case 'first_keys_indy': {
+      if (HOUSING_INSTITUTION_SIGNALS.some(re => re.test(hay))) return true;
+      if (GOV_URL_HINT.test(url)) return true;
+      return false;
+    }
+    case 'funding_ready_indiana': {
+      if (FUNDING_INSTITUTION_SIGNALS.some(re => re.test(hay))) return true;
+      if (GOV_URL_HINT.test(url)) return true;
+      return false;
+    }
+    default:
+      return false;
+  }
 }
 
 // All queries use plain natural language so Firecrawl's web search returns real results.
@@ -1128,36 +1193,40 @@ const LANE_SEARCH_QUERIES: Record<string, string[]> = {
     'Indiana property management company backflow inspection service contact',
   ],
   music_theory_secrets: [
-    // Gospel piano learners seeking lessons
-    'learn gospel piano chords church musician beginner online lessons',
-    // Worship pianists looking for training
-    'worship pianist music director gospel chord progressions learn online',
-    // Church musicians seeking skill development
-    'church musician gospel piano training Indianapolis Indiana worship music',
-    // Reddit piano and church music communities
-    'reddit piano gospel music church musician looking for lessons worship',
-    // Music directors and choir directors
-    'Indianapolis music director choir director worship leader gospel piano skills',
+    // BUYERS, not teaching brands. Never search "online piano lessons" — that
+    // returns competitors who SEO for it. Search the LEARNER's frustrated voice.
+    // Adult learners stuck playing by ear / can't read chords
+    'site:reddit.com adult beginner struggling to play gospel piano by ear frustrated',
+    // Volunteer church pianists thrown into playing without training
+    'church volunteer pianist can not read music wants to play worship songs help',
+    // New worship-team keyboard players overwhelmed by chord charts
+    'new worship team keyboard player overwhelmed chord charts Sunday service reddit',
+    // Self-taught players who plateaued and want theory
+    'self taught pianist plateaued wants to understand gospel chords music theory',
   ],
   first_keys_indy: [
-    // First-time buyers researching assistance programs
-    'Indianapolis first time homebuyer down payment assistance program 2025',
-    // Marion County homebuyer programs
-    'Marion County Indiana homebuyer grant program how to qualify apply',
-    // Reddit Indianapolis real estate discussions
-    'reddit Indianapolis first time home buyer FHA loan down payment help',
-    // Realtors and housing counselors
-    'Indianapolis realtor housing counselor first time homebuyer specialist',
+    // BUYERS = individual renters/first-time buyers, NOT lenders or agencies.
+    // Search the would-be buyer's worry, not the program name (returns govt orgs).
+    // Renters wanting to buy but worried about the down payment
+    'site:reddit.com Indianapolis renter wants to buy first home worried down payment',
+    // First-time buyers asking what they can afford
+    'Indianapolis first time buyer how much down payment can I afford bad credit reddit',
+    // People tired of renting in Marion County
+    'Marion County renter tired of renting want to buy a house can I qualify',
+    // First-gen buyers with no family help researching assistance
+    'first time homebuyer Indiana no down payment saved where to start advice forum',
   ],
   funding_ready_indiana: [
-    // Indiana nonprofit and small business grant seekers
-    'Indiana nonprofit executive director small business grant funding 2025',
-    // SBA and SBDC grant discussions
-    'Indiana small business SBA grant SBDC funding application help 2025',
-    // Indianapolis entrepreneurs seeking capital
-    'Indianapolis entrepreneur startup funding seed capital grant Indiana',
-    // Indiana CDFIs and chambers serving small businesses
-    'Indiana CDFI chamber of commerce small business grant funding contact',
+    // BUYERS = individual SMB owners / nonprofit leaders who NEED funding help,
+    // NOT the SBA/SBDC/CDFI agencies that provide it (those are referral orgs).
+    // Owners who got rejected and don't know why
+    'site:reddit.com small business owner loan application rejected not sure why help',
+    // Founders bootstrapping who aren't investor-ready
+    'Indianapolis small business owner needs funding not ready for a bank loan reddit',
+    // Nonprofit leaders struggling with grant applications
+    'Indiana nonprofit director struggling to get grant funding application overwhelmed',
+    // Owners with messy books blocking them from capital
+    'small business owner messy books bookkeeping not ready to apply for funding reddit',
   ],
 };
 
@@ -1230,9 +1299,13 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
       // ── CALL A: Extract lead profiles (no scoring — extraction only) ─────────
       // EMAIL EXTRACTION: ask GPT to pull any email visible in the scraped content,
       // and also record source_url so we can scrape it for contact emails.
-      const competitorRule = lane === 'colvin_enterprises'
-        ? `\nCRITICAL — COMPETITOR EXCLUSION: Alfred SELLS AI automation/consulting. EXCLUDE any company that itself sells AI automation, AI consulting, workflow automation, web design, marketing, or software services — those are COMPETITORS, not prospects. A valid prospect is a business in a DIFFERENT industry (clinic, CPA, contractor, retailer, law firm, etc.) that would BUY automation. If the source is a vendor's own landing page, skip it.`
-        : '';
+      const EXCLUSION_RULES: Record<string, string> = {
+        colvin_enterprises: `\nCRITICAL — COMPETITOR EXCLUSION: Alfred SELLS AI automation/consulting. EXCLUDE any company that itself sells AI automation, AI consulting, workflow automation, web design, marketing, or software services — those are COMPETITORS, not prospects. A valid prospect is a business in a DIFFERENT industry (clinic, CPA, contractor, retailer, law firm, etc.) that would BUY automation. If the source is a vendor's own landing page, skip it.`,
+        music_theory_secrets: `\nCRITICAL — COMPETITOR EXCLUSION: Alfred SELLS gospel/music-theory education. EXCLUDE other piano teachers, music schools, online course brands (e.g. Pianote, PianoGroove, Hear and Play), and anyone whose title is instructor/teacher/tutor — those are COMPETITORS. A valid prospect is an INDIVIDUAL aspiring pianist, church/worship musician, or choir/music director who wants to improve THEIR OWN playing. If the source is a course or lesson provider's own page, skip it.`,
+        first_keys_indy: `\nCRITICAL — NON-BUYER EXCLUSION: This lane needs INDIVIDUAL first-time homebuyers in Marion County who need down-payment assistance. EXCLUDE mortgage lenders, banks, credit unions, realtors, government housing agencies (HUD, IHCDA, FHLB, INHP), nonprofits, housing counselors, media outlets, and finance-aggregator sites (Bankrate, SoFi, Zillow) — none of those are buyers. A valid prospect is a real person (a renter or first-time buyer) expressing they want to buy a home. If no real individual is named, skip it.`,
+        funding_ready_indiana: `\nCRITICAL — NON-BUYER EXCLUSION: This lane needs INDIVIDUAL small-business owners or nonprofit leaders in Indiana who need help getting funding-ready. EXCLUDE government agencies (SBA, SBDC, IEDC), CDFIs, chambers of commerce, banks, lenders, accounting-software companies (QuickBooks), and grant-listing/directory sites — those are institutions/providers, not buyers. A valid prospect is a real business owner or nonprofit director who needs funding. If no real individual or specific small business is named, skip it.`,
+      };
+      const competitorRule = EXCLUSION_RULES[lane] ?? '';
       const extractPrompt = `You are Lead Scout for Alfred Colvin's business "${lane}" in Indianapolis.
 Extract real prospect profiles from the web research below. ONLY use companies and people mentioned in the source material.
 Do NOT invent names. If a real person's name is not mentioned, leave name as null.
