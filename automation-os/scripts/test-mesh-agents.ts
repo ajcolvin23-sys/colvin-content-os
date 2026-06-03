@@ -83,6 +83,15 @@ async function main() {
   const emailOk = email.ok && email.output!.subject.length > 0 && email.output!.draft.length > 40
   console.log(`outreach.email-copy → subject "${email.output!.subject}" (${email.output!.draft.length} chars)  ${emailOk ? '✓' : '✗'}`)
 
+  // content.linkedin-post — real LLM call, Hook-Story-Offer
+  const post = await runAgent<{ draft: string; character_count: number; flags: string[] }>('content.linkedin-post', {
+    lane: 'colvin_enterprises', hook: 'You are paying people to be robots.',
+    transformation: 'Reclaim hours burned on robot work', rungLabel: 'Free workflow audit',
+    focusNote: 'Drive audit bookings', cta: 'Book a free 30-min workflow audit',
+  })
+  const postOk = post.ok && post.output!.draft.toLowerCase().includes('robot') && post.output!.flags.length === 0
+  console.log(`content.linkedin-post → ${post.output!.character_count} chars, ${post.output!.flags.length} flags  ${postOk ? '✓ hook kept + clean' : '✗'}`)
+
   const logFile = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
   const rows = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').length : 0
   console.log(`\nObservability: ${rows} total agent_runs logged.`)

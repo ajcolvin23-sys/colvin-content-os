@@ -6,7 +6,7 @@ import { registerAgent, hasAgent } from '../registry'
 import type { Agent } from '../types'
 import { REMOTION_AGENTS } from './remotion'
 import { leadScoringAgent, categorizeAgent, leadDedupAgent } from './leads'
-import { colvinInfographicAgent } from './content'
+import { colvinInfographicAgent, linkedInPostAgent } from './content'
 import { dailyReportAgent } from './report'
 import { emailCopyAgent } from './outreach'
 
@@ -16,6 +16,7 @@ const ALL_AGENTS: Agent[] = [
   categorizeAgent,
   leadDedupAgent,
   colvinInfographicAgent,
+  linkedInPostAgent,
   dailyReportAgent,
   emailCopyAgent,
 ]
