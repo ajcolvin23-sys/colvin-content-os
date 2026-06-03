@@ -15,6 +15,7 @@ import { solomonSeoAgent } from './seo'
 import { vibeMarketingAgent } from './marketing'
 import { FUNNEL_AGENTS } from './funnels'
 import { complianceGateAgent } from './gates'
+import { ADMIN_AGENTS } from './admin'
 
 const ALL_AGENTS: Agent[] = [
   ...REMOTION_AGENTS,
@@ -34,6 +35,7 @@ const ALL_AGENTS: Agent[] = [
   calendarPlannerAgent,
   ...FUNNEL_AGENTS,
   complianceGateAgent,
+  ...ADMIN_AGENTS,
 ]
 
 /** Idempotently register every mesh agent. Safe to call multiple times. */
