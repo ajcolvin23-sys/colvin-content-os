@@ -21,7 +21,9 @@
     "colvin_enterprises": {
       "current_rung": "bait",
       "rung_label": "Free workflow audit",
-      "platforms": ["linkedin", "tiktok"],
+      "platforms": ["linkedin"],
+      "content_mode": "linkedin_visual_studio",
+      "no_video": true,
       "cta": "Book a free 30-min workflow audit",
       "cta_link": "https://calendar.app.google/igj4Vfwvc1ZUB3Gc9",
       "focus_note": "Drive audit bookings via cold outreach and content. Pilot and retainer come after the audit converts.",

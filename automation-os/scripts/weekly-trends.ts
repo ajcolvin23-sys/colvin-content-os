@@ -41,12 +41,12 @@ const BRAVE_KEY = process.env.BRAVE_SEARCH_API_KEY ?? ''
 const LANE_RESEARCH: Record<string, { name: string; platforms: string[]; queries: string[]; hub_slug: string }> = {
   colvin_enterprises: {
     name: 'Colvin Enterprises',
-    platforms: ['linkedin', 'tiktok'],
+    platforms: ['linkedin'],
     hub_slug: 'colvin-enterprises',
     queries: [
-      'top LinkedIn posts AI automation small business 2026',
-      'viral TikTok small business AI workflow this week',
-      'best LinkedIn hook formats SMB AI consulting',
+      'top LinkedIn carousels AI automation small business 2026',
+      'most-saved LinkedIn infographics AI agents framework this week',
+      'best LinkedIn carousel hook formats SMB AI consulting',
     ],
   },
   first_keys_indy: {
