@@ -8,6 +8,7 @@ import { REMOTION_AGENTS } from './remotion'
 import { leadScoringAgent, categorizeAgent, leadDedupAgent } from './leads'
 import { colvinInfographicAgent } from './content'
 import { dailyReportAgent } from './report'
+import { emailCopyAgent } from './outreach'
 
 const ALL_AGENTS: Agent[] = [
   ...REMOTION_AGENTS,
@@ -16,6 +17,7 @@ const ALL_AGENTS: Agent[] = [
   leadDedupAgent,
   colvinInfographicAgent,
   dailyReportAgent,
+  emailCopyAgent,
 ]
 
 /** Idempotently register every mesh agent. Safe to call multiple times. */

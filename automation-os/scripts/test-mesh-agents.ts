@@ -75,6 +75,14 @@ async function main() {
   const pipeOk = processed.ok && processed.scored.length === 2 && Number(processed.scored[0].qualification_score) === 8
   console.log(`daily-leads pipeline → ${processed.scored.length} review-ready (top ${processed.scored[0]?.qualification_score})  ${pipeOk ? '✓' : '✗'}`)
 
+  // outreach.email-copy — real LLM call, produces a review-only draft
+  const email = await runAgent<{ subject: string; draft: string }>('outreach.email-copy', {
+    lead: { name: 'Jane Doe', title: 'Operations Director', company: 'Acme Dental', lane: 'colvin_enterprises', fit_reason: 'manual scheduling + intake' },
+    cta: 'Book a free 30-min workflow audit', ctaLink: 'https://calendar.app.google/x',
+  })
+  const emailOk = email.ok && email.output!.subject.length > 0 && email.output!.draft.length > 40
+  console.log(`outreach.email-copy → subject "${email.output!.subject}" (${email.output!.draft.length} chars)  ${emailOk ? '✓' : '✗'}`)
+
   const logFile = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
   const rows = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').length : 0
   console.log(`\nObservability: ${rows} total agent_runs logged.`)
