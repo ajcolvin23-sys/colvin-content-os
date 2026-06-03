@@ -12,6 +12,8 @@ import { emailCopyAgent } from './outreach'
 import { leadFinderAgent } from './research'
 import { solomonSeoAgent } from './seo'
 import { vibeMarketingAgent } from './marketing'
+import { FUNNEL_AGENTS } from './funnels'
+import { complianceGateAgent } from './gates'
 
 const ALL_AGENTS: Agent[] = [
   ...REMOTION_AGENTS,
@@ -27,6 +29,8 @@ const ALL_AGENTS: Agent[] = [
   carouselAgent,
   dailyReportAgent,
   emailCopyAgent,
+  ...FUNNEL_AGENTS,
+  complianceGateAgent,
 ]
 
 /** Idempotently register every mesh agent. Safe to call multiple times. */
