@@ -5,14 +5,17 @@
 import { registerAgent, hasAgent } from '../registry'
 import type { Agent } from '../types'
 import { REMOTION_AGENTS } from './remotion'
-import { leadScoringAgent, categorizeAgent } from './leads'
+import { leadScoringAgent, categorizeAgent, leadDedupAgent } from './leads'
 import { colvinInfographicAgent } from './content'
+import { dailyReportAgent } from './report'
 
 const ALL_AGENTS: Agent[] = [
   ...REMOTION_AGENTS,
   leadScoringAgent,
   categorizeAgent,
+  leadDedupAgent,
   colvinInfographicAgent,
+  dailyReportAgent,
 ]
 
 /** Idempotently register every mesh agent. Safe to call multiple times. */

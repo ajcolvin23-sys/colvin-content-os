@@ -28,6 +28,49 @@ export const leadScoringAgent: Agent<{ leads: ScorableLead[] }, { scored: Scorab
   },
 }
 
+interface DedupLead { linkedin_url?: string | null; company?: string | null; [k: string]: unknown }
+
+// Step 8 — drop leads contacted within the last 30 days (by linkedin_url OR company).
+// Self-contained: opens its own admin client; falls back to passthrough with no DB.
+export const leadDedupAgent: Agent<{ leads: DedupLead[] }, { unique: DedupLead[]; removed: number }> = {
+  name: 'leads.dedup',
+  description: 'Removes leads contacted in the last 30 days (linkedin_url + company check). (gabriel:daily step 8)',
+  kind: 'deterministic',
+  inputSchema: {
+    type: 'object', required: ['leads'],
+    properties: { leads: { type: 'array' } },
+  },
+  outputSchema: {
+    type: 'object', required: ['unique', 'removed'],
+    properties: { unique: { type: 'array' }, removed: { type: 'number' } },
+  },
+  async run(input, ctx) {
+    const leads = input.leads
+    try {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const linkedinUrls = leads.map((l) => l.linkedin_url).filter(Boolean) as string[]
+      const companyNames = leads.map((l) => l.company).filter(Boolean) as string[]
+      const [linkedinResult, companyResult] = await Promise.all([
+        linkedinUrls.length ? supabase.from('leads').select('linkedin_url, company, last_contacted_at').in('linkedin_url', linkedinUrls) : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+        companyNames.length ? supabase.from('leads').select('linkedin_url, company, last_contacted_at').in('company', companyNames) : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+      ])
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const recent = (rows: Array<Record<string, unknown>> | null, key: string) => new Set<string>(
+        (rows ?? []).filter((r) => r.last_contacted_at && new Date(r.last_contacted_at as string).getTime() > cutoff).map((r) => r[key] as string).filter(Boolean),
+      )
+      const recentLinkedins = recent(linkedinResult.data, 'linkedin_url')
+      const recentCompanies = recent(companyResult.data, 'company')
+      const unique = leads.filter((l) => (l.linkedin_url ? !recentLinkedins.has(l.linkedin_url) : !recentCompanies.has(l.company ?? '')))
+      ctx.log(`dedup: ${unique.length} unique (removed ${leads.length - unique.length})`)
+      return { unique, removed: leads.length - unique.length }
+    } catch {
+      ctx.log('dedup: no DB — passthrough (0 removed)')
+      return { unique: leads, removed: 0 }
+    }
+  },
+}
+
 interface Prioritized { priority_score: number; [k: string]: unknown }
 
 // Step 10 — route outputs into review queues.

@@ -50,12 +50,27 @@ async function main() {
   const catOk = cat.ok && cat.output!.outreach.length === 2 && cat.output!.content.length === 2
   console.log(`leads.categorize → ${cat.output!.outreach.length} outreach / ${cat.output!.content.length} content  ${catOk ? '✓ parity' : '✗ MISMATCH'}`)
 
+  // leads.dedup — passthrough when no DB (parity with step 8's try/catch fallback)
+  const dedup = await runAgent<{ unique: unknown[]; removed: number }>('leads.dedup', {
+    leads: [{ company: 'X', linkedin_url: 'u1' }, { company: 'Y' }],
+  })
+  const dedupOk = dedup.ok && Array.isArray(dedup.output!.unique)
+  console.log(`leads.dedup → ${dedup.output!.unique.length} unique / ${dedup.output!.removed} removed  ${dedupOk ? '✓' : '✗'}`)
+
+  // report.daily — deterministic summary assembly (step 13 parity)
+  const rep = await runAgent<{ summary: { leads_found: number; leads_queued_for_review: number } }>('report.daily', {
+    rawLeadsCount: 6, uniqueLeadsCount: 4,
+    outreach: [{ priority_score: 9 }, { priority_score: 5 }], contentCount: 5, seoCount: 0,
+  })
+  const repOk = rep.ok && rep.output!.summary.leads_found === 6 && rep.output!.summary.leads_queued_for_review === 1
+  console.log(`report.daily → ${rep.output!.summary.leads_found} leads / ${rep.output!.summary.leads_queued_for_review} queued  ${repOk ? '✓ parity' : '✗ MISMATCH'}`)
+
   const logFile = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
   const rows = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').length : 0
   console.log(`\nObservability: ${rows} total agent_runs logged.`)
 
-  const pass = scoringOk && catOk
-  console.log(`\n${pass ? '✅ PHASE 2 BATCH 1 PASSES' : '❌ FAILED'} — promoted steps run through the mesh with parity.`)
+  const pass = scoringOk && catOk && dedupOk && repOk
+  console.log(`\n${pass ? '✅ PHASE 2 BATCHES 1–2 PASS' : '❌ FAILED'} — promoted steps run through the mesh with parity.`)
   if (!pass) process.exit(1)
 }
 
