@@ -139,3 +139,9 @@ export async function runAgent<O = unknown>(
 
 /** Test/dev only — clears circuit breaker state. */
 export function _resetBreakers(): void { breakers.clear() }
+
+/** Snapshot of every circuit breaker (for the Supervisor / dashboard). */
+export function getBreakerStates(): Array<{ agent: string; failures: number; open: boolean; openUntil: number }> {
+  const now = Date.now()
+  return [...breakers.entries()].map(([agent, b]) => ({ agent, failures: b.failures, open: now < b.openUntil, openUntil: b.openUntil }))
+}
