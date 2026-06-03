@@ -68,3 +68,25 @@ Return JSON: { subject: string, draft: string, compliance_flags: string[] }`
     return { subject: json.subject ?? `Quick note — ${lead.company}`, draft: json.draft ?? '', compliance_flags: json.compliance_flags ?? [] }
   },
 }
+
+// ── Multi-step outreach sequence (Phase 3 — Outbound Sequence Agent) ─────────
+interface SeqInput { lead: EmailLead; cta: string; steps?: number }
+interface SeqStep { step: number; day: number; channel: string; subject?: string; body: string }
+export const outreachSequenceAgent: Agent<SeqInput, { sequence: SeqStep[] }> = {
+  name: 'outreach.sequence',
+  description: 'Designs a multi-step follow-up sequence for a lead (review-only, never sent).',
+  kind: 'llm', taskType: 'outreach_drafts',
+  inputSchema: { type: 'object', required: ['lead', 'cta'], properties: { lead: { type: 'object' }, cta: { type: 'string' }, steps: { type: 'number' } } },
+  outputSchema: { type: 'object', required: ['sequence'], properties: { sequence: { type: 'array' } } },
+  async run(input, ctx) {
+    const steps = input.steps ?? 4
+    const { json } = await callClaudeJSON<{ sequence: SeqStep[] }>({
+      taskType: 'outreach_drafts', lane: input.lead.lane,
+      system: `You are the Outreach Sequence Agent for Alfred Colvin (Indianapolis, AI automation). Design a ${steps}-touch follow-up sequence that is value-first, never pushy, spaced over ~2 weeks. Each touch adds new value (insight, resource, soft ask). No fabricated proof. CTA: "${input.cta}". Return JSON: { sequence: [{ step, day, channel ("email"|"linkedin"), subject, body }] }`,
+      user: `Lead: ${input.lead.name ?? '[Contact]'} at ${input.lead.company} (${input.lead.title ?? 'unknown role'}). Lane: ${input.lead.lane}. Fit: ${input.lead.fit_reason ?? ''}.`,
+      maxTokensOverride: 2200,
+    })
+    ctx.log(`${(json.sequence ?? []).length}-touch sequence`)
+    return { sequence: json.sequence ?? [] }
+  },
+}

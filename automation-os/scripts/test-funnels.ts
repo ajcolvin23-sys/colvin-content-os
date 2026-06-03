@@ -55,8 +55,21 @@ async function main() {
   })
   console.log(`  conversion audit: score ${audit.output!.score}/10, ${audit.output!.recommendations.length} recs`)
 
-  const pass = gateOk && funnelOk && audit.ok
-  console.log(`\n${pass ? '✅ PHASE 3 (Funnels + compliance) PASS' : '❌ FAILED'} — full funnel built through Hermes.`)
+  // outreach.sequence — multi-touch follow-up
+  const seq = await runAgent<{ sequence: unknown[] }>('outreach.sequence', {
+    lead: { name: 'Pat Lee', company: 'Lee CPA', title: 'Owner', lane: 'colvin_enterprises', fit_reason: 'manual client intake' },
+    cta: 'Book a free 30-min workflow audit', steps: 4,
+  })
+  console.log(`outreach.sequence → ${seq.output!.sequence.length}-touch  ${seq.ok && seq.output!.sequence.length >= 3 ? '✓' : '✗'}`)
+
+  // calendar.planner — multi-lane content plan
+  const cal = await runAgent<{ plan: unknown[]; gaps: string[] }>('calendar.planner', {
+    lanes: ['colvin_enterprises', 'music_theory_secrets', 'first_keys_indy'], daysAhead: 7,
+  })
+  console.log(`calendar.planner → ${cal.output!.plan.length} entries, ${cal.output!.gaps.length} gaps  ${cal.ok && cal.output!.plan.length > 0 ? '✓' : '✗'}`)
+
+  const pass = gateOk && funnelOk && audit.ok && seq.ok && cal.ok
+  console.log(`\n${pass ? '✅ PHASE 3 (Funnels + outreach seq + calendar + compliance) PASS' : '❌ FAILED'} — full capability group through Hermes.`)
   if (!pass) process.exit(1)
 }
 

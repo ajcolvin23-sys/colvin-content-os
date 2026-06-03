@@ -8,8 +8,9 @@ import { REMOTION_AGENTS } from './remotion'
 import { leadScoringAgent, categorizeAgent, leadDedupAgent } from './leads'
 import { colvinInfographicAgent, linkedInPostAgent, facebookPostAgent, carouselAgent } from './content'
 import { dailyReportAgent } from './report'
-import { emailCopyAgent } from './outreach'
+import { emailCopyAgent, outreachSequenceAgent } from './outreach'
 import { leadFinderAgent } from './research'
+import { calendarPlannerAgent } from './calendar'
 import { solomonSeoAgent } from './seo'
 import { vibeMarketingAgent } from './marketing'
 import { FUNNEL_AGENTS } from './funnels'
@@ -29,6 +30,8 @@ const ALL_AGENTS: Agent[] = [
   carouselAgent,
   dailyReportAgent,
   emailCopyAgent,
+  outreachSequenceAgent,
+  calendarPlannerAgent,
   ...FUNNEL_AGENTS,
   complianceGateAgent,
 ]
