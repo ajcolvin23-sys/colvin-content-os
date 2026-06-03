@@ -10,10 +10,14 @@ import { colvinInfographicAgent, linkedInPostAgent, facebookPostAgent, carouselA
 import { dailyReportAgent } from './report'
 import { emailCopyAgent } from './outreach'
 import { leadFinderAgent } from './research'
+import { solomonSeoAgent } from './seo'
+import { vibeMarketingAgent } from './marketing'
 
 const ALL_AGENTS: Agent[] = [
   ...REMOTION_AGENTS,
   leadFinderAgent,
+  solomonSeoAgent,
+  vibeMarketingAgent,
   leadScoringAgent,
   categorizeAgent,
   leadDedupAgent,

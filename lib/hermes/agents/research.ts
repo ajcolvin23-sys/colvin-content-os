@@ -10,9 +10,9 @@ import type { Agent } from '../types'
 
 const BRAVE_KEY = process.env.BRAVE_SEARCH_API_KEY || ''
 
-interface SearchResult { url: string; title: string; description: string }
+export interface SearchResult { url: string; title: string; description: string }
 
-function braveSearch(query: string, limit = 5): Promise<SearchResult[]> {
+export function braveSearch(query: string, limit = 5): Promise<SearchResult[]> {
   if (!BRAVE_KEY) return Promise.resolve([])
   return new Promise((resolve) => {
     const params = new URLSearchParams({ q: query, count: String(Math.min(limit, 20)), search_lang: 'en', country: 'us' })

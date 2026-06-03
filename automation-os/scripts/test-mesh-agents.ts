@@ -119,6 +119,22 @@ async function main() {
     console.log('leads.finder → skipped (no BRAVE_SEARCH_API_KEY)')
   }
 
+  // marketing.vibe — 3 zero-budget actions (lane context only)
+  const vibe = await runAgent<{ recommendations: string[] }>('marketing.vibe', {
+    activeLanes: ['colvin_enterprises', 'music_theory_secrets'], focusLane: 'colvin_enterprises',
+  })
+  console.log(`marketing.vibe → ${vibe.output!.recommendations.length} actions  ${vibe.ok && vibe.output!.recommendations.length === 3 ? '✓' : '✗'}`)
+
+  // seo.solomon — live SERP (informational; network-dependent, not in pass gate)
+  if (process.env.BRAVE_SEARCH_API_KEY) {
+    try {
+      const seo = await runAgent<{ opportunities: string[]; evidence_urls: string[] }>('seo.solomon', {
+        lane: 'colvin_enterprises', query: 'AI automation for small business Indianapolis',
+      })
+      console.log(`seo.solomon → ${seo.output?.opportunities.length ?? 0} opportunities / ${seo.output?.evidence_urls.length ?? 0} sources  ${seo.ok ? '✓' : '✗'}`)
+    } catch (e) { console.log(`seo.solomon → skipped (${String(e).slice(0, 50)})`) }
+  }
+
   const logFile = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
   const rows = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').length : 0
   console.log(`\nObservability: ${rows} total agent_runs logged.`)
