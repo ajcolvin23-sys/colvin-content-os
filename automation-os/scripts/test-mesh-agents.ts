@@ -65,12 +65,22 @@ async function main() {
   const repOk = rep.ok && rep.output!.summary.leads_found === 6 && rep.output!.summary.leads_queued_for_review === 1
   console.log(`report.daily → ${rep.output!.summary.leads_found} leads / ${rep.output!.summary.leads_queued_for_review} queued  ${repOk ? '✓ parity' : '✗ MISMATCH'}`)
 
+  // daily-leads pipeline — dedup → scoring composed through Hermes
+  const { runDailyLeadPipeline } = await import('../../lib/hermes/pipelines/daily-leads')
+  const processed = await runDailyLeadPipeline([
+    { company: 'P', qualification_score: 8, linkedin_url: 'lp' },
+    { company: 'Q', qualification_score: 2 },
+    { company: 'R', qualification_score: 7 },
+  ])
+  const pipeOk = processed.ok && processed.scored.length === 2 && Number(processed.scored[0].qualification_score) === 8
+  console.log(`daily-leads pipeline → ${processed.scored.length} review-ready (top ${processed.scored[0]?.qualification_score})  ${pipeOk ? '✓' : '✗'}`)
+
   const logFile = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
   const rows = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').length : 0
   console.log(`\nObservability: ${rows} total agent_runs logged.`)
 
-  const pass = scoringOk && catOk && dedupOk && repOk
-  console.log(`\n${pass ? '✅ PHASE 2 BATCHES 1–2 PASS' : '❌ FAILED'} — promoted steps run through the mesh with parity.`)
+  const pass = scoringOk && catOk && dedupOk && repOk && pipeOk
+  console.log(`\n${pass ? '✅ PHASE 2 (batches 1–3) PASS' : '❌ FAILED'} — promoted steps + first real pipeline run through Hermes.`)
   if (!pass) process.exit(1)
 }
 
