@@ -92,6 +92,20 @@ async function main() {
   const postOk = post.ok && post.output!.draft.toLowerCase().includes('robot') && post.output!.flags.length === 0
   console.log(`content.linkedin-post → ${post.output!.character_count} chars, ${post.output!.flags.length} flags  ${postOk ? '✓ hook kept + clean' : '✗'}`)
 
+  // leads.finder — real Brave + Claude (informational; network-dependent, not in pass gate)
+  if (process.env.BRAVE_SEARCH_API_KEY) {
+    try {
+      const finder = await runAgent<{ leads: unknown[]; sources: number }>('leads.finder', {
+        lane: 'colvin_enterprises',
+        queries: ['Indianapolis small business owner overwhelmed manual scheduling needs help'],
+        max: 4,
+      })
+      console.log(`leads.finder → ${finder.output?.sources ?? 0} sources, ${finder.output?.leads.length ?? 0} prospects extracted  ${finder.ok ? '✓' : '✗'}`)
+    } catch (e) { console.log(`leads.finder → skipped (${String(e).slice(0, 60)})`) }
+  } else {
+    console.log('leads.finder → skipped (no BRAVE_SEARCH_API_KEY)')
+  }
+
   const logFile = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
   const rows = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').length : 0
   console.log(`\nObservability: ${rows} total agent_runs logged.`)

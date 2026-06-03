@@ -9,9 +9,11 @@ import { leadScoringAgent, categorizeAgent, leadDedupAgent } from './leads'
 import { colvinInfographicAgent, linkedInPostAgent } from './content'
 import { dailyReportAgent } from './report'
 import { emailCopyAgent } from './outreach'
+import { leadFinderAgent } from './research'
 
 const ALL_AGENTS: Agent[] = [
   ...REMOTION_AGENTS,
+  leadFinderAgent,
   leadScoringAgent,
   categorizeAgent,
   leadDedupAgent,

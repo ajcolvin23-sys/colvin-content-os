@@ -38,3 +38,20 @@ export async function runDailyLeadPipeline(
     runId: result.runId,
   }
 }
+
+/** finder → dedup → scoring: full discovery for a lane (web research → review-ready). */
+export async function runLeadDiscovery(lane: string, queries: string[], max = 5): Promise<ProcessedLeads> {
+  registerMeshAgents()
+  const result = await runPipeline(
+    [
+      { agent: 'leads.finder' },
+      { agent: 'leads.dedup', map: (acc) => ({ leads: (acc['leads.finder'] as { leads: unknown[] }).leads }) },
+      { agent: 'leads.scoring', map: (acc) => ({ leads: ((acc['leads.dedup'] as { unique: Array<Record<string, unknown>> }).unique).map((l) => ({ ...l, qualification_score: Number(l.qualification_score ?? 6) })) }) },
+    ],
+    { lane, queries, max },
+    { name: 'lead-discovery', lane },
+  )
+  const dedup = result.outputs['leads.dedup'] as { removed: number } | undefined
+  const scoring = result.outputs['leads.scoring'] as { scored: Array<Record<string, unknown>> } | undefined
+  return { ok: result.ok, scored: scoring?.scored ?? [], removed: dedup?.removed ?? 0, runId: result.runId }
+}
