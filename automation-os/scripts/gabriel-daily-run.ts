@@ -14,6 +14,7 @@ import * as path from 'path';
 import * as https from 'https';
 import * as zlib from 'zlib';
 import { generateColvinInfographic } from './gen-colvin-infographic';
+import { runVideoStudio } from '../../lib/hermes/agents/remotion';
 
 // Load .env.local before any env var access
 const envPath = path.resolve(__dirname, '../../.env.local');
@@ -2261,6 +2262,41 @@ Return JSON: { draft: string }`;
         } catch (e) {
           if ((e as { __skipVideo?: boolean })?.__skipVideo) throw e;
           // query failed — proceed with generation rather than block content
+        }
+
+        // ── Video Studio cutover (Phase 1 agent mesh) — behind a flag ────────
+        // VIDEO_ENGINE=studio routes video generation through the Hermes Remotion
+        // Studio (7 QA-gated agents). Default stays the inline generator below
+        // (strangler-fig — gabriel:daily is unchanged unless the flag is set).
+        if (process.env.VIDEO_ENGINE === 'studio') {
+          const studio = await runVideoStudio({
+            lane: targetLane, platform: 'tiktok',
+            hook: hook ?? 'Most people have this wrong.',
+            transformation, rung_label: rungLabel, cta,
+          });
+          if (studio.ok && studio.blueprint) {
+            const bp = studio.blueprint as Record<string, unknown>;
+            bp.video_id = videoId; // keep day/run id convention so dedup + render line up
+            const videosDir = path.join(__dirname, '../../videos');
+            if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
+            fs.writeFileSync(path.join(videosDir, `${videoId}.json`), JSON.stringify(bp, null, 2));
+            try {
+              await supabase.from('video_projects').insert({
+                title: bp.title, lane: targetLane, platform: 'tiktok', aspect_ratio: '9:16',
+                render_status: 'draft', voiceover_script: bp.voiceover_script, render_settings: bp,
+              });
+            } catch { /* non-fatal — JSON is source of truth */ }
+            const readable = `[Hermes Video Studio] ${bp.title}\n📁 videos/${videoId}.json — 6-scene cinematic, QA-passed`;
+            drafts.push({
+              lane: targetLane, platform: 'tiktok', content_type: 'video_script',
+              draft: readable, character_count: readable.length,
+              review_required: true, status: 'pending_review',
+              katrina_review_required: isKatrinaLane, video_script_id: videoId,
+            } as ContentDraft & { katrina_review_required?: boolean; video_script_id?: string });
+            console.log(`  ${targetLane}: ✓ video via Hermes Studio → videos/${videoId}.json`);
+            throw { __skipVideo: true }; // skip the inline generator below (sentinel ignored by outer catch)
+          }
+          console.log(`  ${targetLane}: studio QA failed (${studio.issues.join('; ')}) — falling back to inline generator`);
         }
 
         // ── CINEMATIC 6-SCENE STRUCTURE (LOCKED UPGRADE 010) ─────────────────
