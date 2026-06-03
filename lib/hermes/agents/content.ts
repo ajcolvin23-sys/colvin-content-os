@@ -96,3 +96,64 @@ Return JSON: { draft: string, character_count: number }`
     return { draft, character_count: draft.length, flags }
   },
 }
+
+// ── Facebook adaptation — promoted from step 5 ──────────────────────────────
+interface FbInput { linkedinDraft: string; cta: string }
+export const facebookPostAgent: Agent<FbInput, { draft: string }> = {
+  name: 'content.facebook-post',
+  description: 'Adapts a LinkedIn post for Facebook (community tone, ends with a question). (gabriel:daily step 5)',
+  kind: 'llm',
+  taskType: 'content_generation',
+  inputSchema: { type: 'object', required: ['linkedinDraft', 'cta'], properties: { linkedinDraft: { type: 'string' }, cta: { type: 'string' } } },
+  outputSchema: { type: 'object', required: ['draft'], properties: { draft: { type: 'string' } } },
+  async run(input, ctx) {
+    const system = `You are Genius, Alfred Colvin's content agent. Adapt this LinkedIn post for Facebook.
+Rules:
+- Community-friendly tone — Indianapolis locals, faith community, entrepreneurs
+- Open with the hook compressed for Facebook (conversational, not corporate)
+- Under 450 chars
+- End with a genuine question that invites comments (not "what do you think?")
+- Include the CTA: "${input.cta}"
+Return JSON: { draft: string }`
+    const { json } = await callClaudeJSON<{ draft: string }>({
+      taskType: 'content_generation', system, user: `LinkedIn post to adapt:\n${input.linkedinDraft.slice(0, 800)}`, maxTokensOverride: 400,
+    })
+    ctx.log(`facebook ${(json.draft ?? '').length} chars`)
+    return { draft: json.draft ?? '' }
+  },
+}
+
+// ── 5-slide carousel — promoted from step 5 ─────────────────────────────────
+interface CarouselInput { lane: string; hook: string; transformation?: string; rungLabel?: string; cta: string }
+interface Slide { slide_number: number; label: string; text: string; design_note: string }
+export const carouselAgent: Agent<CarouselInput, { slides: Slide[]; cover_caption: string; draft: string }> = {
+  name: 'content.carousel',
+  description: 'Writes a 5-slide Hook-Story-Offer carousel (Hook→Problem→Reframe→Proof→Offer). (gabriel:daily step 5)',
+  kind: 'llm',
+  taskType: 'content_generation',
+  inputSchema: { type: 'object', required: ['lane', 'hook', 'cta'], properties: { lane: { type: 'string' }, hook: { type: 'string' }, transformation: { type: 'string' }, rungLabel: { type: 'string' }, cta: { type: 'string' } } },
+  outputSchema: { type: 'object', required: ['slides', 'draft'], properties: { slides: { type: 'array' }, cover_caption: { type: 'string' }, draft: { type: 'string' } } },
+  async run(input, ctx) {
+    const system = `You are Genius, Alfred Colvin's content strategist. Write a 5-slide carousel post using the Hook-Story-Offer framework.
+
+Alfred's voice: direct, warm, faith-rooted. Indianapolis. Clean, bold text — each slide is read in 3 seconds.
+
+SLIDE STRUCTURE:
+Slide 1 — HOOK: "${input.hook}" (large bold text, nothing else)
+Slide 2 — THE PROBLEM: One sentence naming the pain or cost. Under 12 words.
+Slide 3 — THE REFRAME: The contrarian truth or insight. Under 15 words.
+Slide 4 — THE PROOF/STORY: A before/after or example. Label hypothetical as (example). Under 20 words.
+Slide 5 — THE OFFER: CTA + next step. "${input.cta}" — under 12 words.
+
+Lane: ${input.lane} | Transformation: "${input.transformation ?? ''}" | Rung: ${input.rungLabel ?? 'current offer'}
+
+Return JSON: { slides: [ { slide_number, label, text, design_note } ], cover_caption: string }`
+    const { json } = await callClaudeJSON<{ slides: Slide[]; cover_caption: string }>({
+      taskType: 'content_generation', system, lane: input.lane, user: `Write the 5-slide carousel for ${input.lane}. No invented proof.`, maxTokensOverride: 700,
+    })
+    const slides = json.slides ?? []
+    const draft = slides.map((s) => `[Slide ${s.slide_number} — ${s.label}]\n${s.text}\n💡 Design: ${s.design_note}`).join('\n\n') + `\n\n[Cover Caption]\n${json.cover_caption ?? ''}`
+    ctx.log(`carousel ${slides.length} slides`)
+    return { slides, cover_caption: json.cover_caption ?? '', draft }
+  },
+}

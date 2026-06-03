@@ -92,6 +92,19 @@ async function main() {
   const postOk = post.ok && post.output!.draft.toLowerCase().includes('robot') && post.output!.flags.length === 0
   console.log(`content.linkedin-post → ${post.output!.character_count} chars, ${post.output!.flags.length} flags  ${postOk ? '✓ hook kept + clean' : '✗'}`)
 
+  // content.facebook-post — adapt the LinkedIn draft
+  const fb = await runAgent<{ draft: string }>('content.facebook-post', {
+    linkedinDraft: post.output!.draft, cta: 'Book a free 30-min workflow audit',
+  })
+  console.log(`content.facebook-post → ${fb.output!.draft.length} chars  ${fb.ok && fb.output!.draft.length > 20 ? '✓' : '✗'}`)
+
+  // content.carousel — 5-slide Hook-Story-Offer
+  const car = await runAgent<{ slides: unknown[]; draft: string }>('content.carousel', {
+    lane: 'colvin_enterprises', hook: 'You are paying people to be robots.',
+    transformation: 'Reclaim hours burned on robot work', rungLabel: 'Free workflow audit', cta: 'Book a free 30-min workflow audit',
+  })
+  console.log(`content.carousel → ${car.output!.slides.length} slides  ${car.ok && car.output!.slides.length === 5 ? '✓' : '✗'}`)
+
   // leads.finder — real Brave + Claude (informational; network-dependent, not in pass gate)
   if (process.env.BRAVE_SEARCH_API_KEY) {
     try {
