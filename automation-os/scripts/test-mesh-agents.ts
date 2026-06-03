@@ -1,0 +1,62 @@
+#!/usr/bin/env ts-node
+/**
+ * test-mesh-agents.ts — Phase 2 batch 1.
+ * Registers all mesh agents and runs the promoted deterministic steps
+ * (leads.scoring → leads.categorize) through Hermes, proving they behave
+ * identically to gabriel:daily steps 9 & 10 and are observable.
+ *   npm run test:mesh
+ */
+import * as fs from 'fs'
+import * as path from 'path'
+
+const ROOT = path.resolve(__dirname, '../..')
+;(() => {
+  const envPath = path.join(ROOT, '.env.local')
+  if (!fs.existsSync(envPath)) return
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const t = line.trim(); if (!t || t.startsWith('#')) continue
+    const i = t.indexOf('='); if (i < 0) continue
+    const k = t.slice(0, i).trim(), v = t.slice(i + 1).trim()
+    if (!process.env[k]) process.env[k] = v
+  }
+})()
+
+import { registerMeshAgents, ALL_AGENTS } from '../../lib/hermes/agents'
+import { runAgent, listAgents } from '../../lib/hermes'
+
+async function main() {
+  registerMeshAgents()
+  console.log(`Registered ${ALL_AGENTS.length} mesh agents:`)
+  console.log('  ' + listAgents().join('\n  '))
+
+  // leads.scoring — filter <5, sort desc (gabriel:daily step 9 parity)
+  const leads = [
+    { company: 'A', qualification_score: 8 },
+    { company: 'B', qualification_score: 3 },
+    { company: 'C', qualification_score: 6 },
+    { company: 'D', qualification_score: 9 },
+  ]
+  const scored = await runAgent<{ scored: Array<{ company: string; qualification_score: number }> }>('leads.scoring', { leads })
+  const order = scored.output!.scored.map((l) => `${l.company}:${l.qualification_score}`).join(', ')
+  const scoringOk = scored.ok && scored.output!.scored.length === 3 && order === 'D:9, A:8, C:6'
+  console.log(`\nleads.scoring → [${order}]  ${scoringOk ? '✓ parity' : '✗ MISMATCH'}`)
+
+  // leads.categorize — outreach priority>=7 only (step 10 parity)
+  const cat = await runAgent<{ outreach: unknown[]; content: unknown[]; seo: unknown[] }>('leads.categorize', {
+    outreach: [{ priority_score: 9 }, { priority_score: 5 }, { priority_score: 7 }],
+    content: [{ x: 1 }, { x: 2 }],
+    seo: ['kw1'],
+  })
+  const catOk = cat.ok && cat.output!.outreach.length === 2 && cat.output!.content.length === 2
+  console.log(`leads.categorize → ${cat.output!.outreach.length} outreach / ${cat.output!.content.length} content  ${catOk ? '✓ parity' : '✗ MISMATCH'}`)
+
+  const logFile = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
+  const rows = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').length : 0
+  console.log(`\nObservability: ${rows} total agent_runs logged.`)
+
+  const pass = scoringOk && catOk
+  console.log(`\n${pass ? '✅ PHASE 2 BATCH 1 PASSES' : '❌ FAILED'} — promoted steps run through the mesh with parity.`)
+  if (!pass) process.exit(1)
+}
+
+main().catch((e) => { console.error('FATAL:', e); process.exit(1) })

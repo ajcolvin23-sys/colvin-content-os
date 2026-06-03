@@ -25,6 +25,7 @@
     "colvin:infographic": "DOTENV_CONFIG_PATH=.env.local ./node_modules/.bin/ts-node -r dotenv/config -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/gen-colvin-infographic.ts",
     "test:hermes": "DOTENV_CONFIG_PATH=.env.local ./node_modules/.bin/ts-node -r dotenv/config -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/test-hermes-spine.ts",
     "test:studio": "DOTENV_CONFIG_PATH=.env.local ./node_modules/.bin/ts-node -r dotenv/config -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/test-remotion-studio.ts",
+    "test:mesh": "DOTENV_CONFIG_PATH=.env.local ./node_modules/.bin/ts-node -r dotenv/config -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/test-mesh-agents.ts",
     "weekly:trends": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/weekly-trends.ts",
     "blog:weekly": "./node_modules/.bin/ts-node -r tsconfig-paths/register --compiler-options '{\"module\":\"commonjs\"}' automation-os/scripts/weekly-blog.ts",
     "render:json": "npx ts-node --project remotion/tsconfig.json scripts/render-video-json.ts",
