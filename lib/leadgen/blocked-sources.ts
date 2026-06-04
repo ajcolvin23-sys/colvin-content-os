@@ -35,5 +35,14 @@ export function isBlockedSource(url: string): boolean {
   } catch { return false }
 }
 
+// Keyword regex for scrubbing freelance/job-platform mentions from any text
+// (e.g. the Telegram/email brief) — belt-and-suspenders on top of source filtering.
+export const BLOCKED_KEYWORDS = /\b(upwork|fiverr|freelanc\w*|peopleperhour|toptal|guru\.com|workana|contra\.com|99designs|designhill|thumbtack|bark\.com|taskrabbit|angi\b|homeadvisor|clutch\.co|indeed|ziprecruiter|glassdoor|monster\.com|careerbuilder|simplyhired|flexjobs|wellfound|angellist|angel\.co)\b/i
+
+/** Remove any line that mentions a freelance/gig/job platform. Used before sending briefs. */
+export function scrubBlockedLines(text: string): string {
+  return text.split('\n').filter((line) => !BLOCKED_KEYWORDS.test(line)).join('\n')
+}
+
 // Drop-in exclusion text for lead-extraction prompts (both scout paths).
 export const FREELANCE_EXCLUSION = `\nABSOLUTE EXCLUSION (permanent): NEVER extract freelancers, contractors advertising their own services, job-seekers, or anyone listed on freelance/gig marketplaces or job boards (Upwork, Fiverr, Freelancer, PeoplePerHour, Toptal, Guru, Thumbtack, Bark, Indeed, ZipRecruiter, etc.). Those are people looking for work — not prospects. If a source is one of these platforms or a "hire me / portfolio / find work" page, skip it entirely.`

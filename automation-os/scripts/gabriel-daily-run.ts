@@ -15,7 +15,7 @@ import * as https from 'https';
 import * as zlib from 'zlib';
 import { generateColvinInfographic } from './gen-colvin-infographic';
 import { runVideoStudio } from '../../lib/hermes/agents/remotion';
-import { isBlockedSource, FREELANCE_EXCLUSION } from '../../lib/leadgen/blocked-sources';
+import { isBlockedSource, FREELANCE_EXCLUSION, scrubBlockedLines, BLOCKED_KEYWORDS } from '../../lib/leadgen/blocked-sources';
 
 // Load .env.local before any env var access
 const envPath = path.resolve(__dirname, '../../.env.local');
@@ -3243,7 +3243,12 @@ async function step15_telegramBrief(
       : '',
   ].filter(Boolean).join('\n');
 
-  await sendTelegram(brief);
+  // Final safety net: never let a freelance/gig/job-platform mention reach Telegram,
+  // even from old carry-forward data. Source filtering already keeps them out of the
+  // pipeline; this guarantees the brief is clean too.
+  const safeBrief = scrubBlockedLines(brief);
+
+  await sendTelegram(safeBrief);
   console.log('  Telegram brief sent.');
 
   // Separate Katrina notification — ONLY fires when compliance-lane items exist
@@ -3390,7 +3395,10 @@ async function main() {
   await step12_saveOutputs(scoredLeads, outreachDrafts, contentDrafts, seoReports, marketingRecs).catch(e => errors.push(`Step 12: ${e}`));
 
   // Steps 13–15 (report + deliver)
-  const top3 = await step14_top3Actions(outreach, content, seo, config, memory.carry_forward).catch(e => { errors.push(`Step 14: ${e}`); return []; });
+  const top3Raw = await step14_top3Actions(outreach, content, seo, config, memory.carry_forward).catch(e => { errors.push(`Step 14: ${e}`); return []; });
+  // Drop any action that references a freelance/gig/job platform so neither the
+  // Telegram nor the email brief ever surfaces a blocked source.
+  const top3 = top3Raw.filter(a => !BLOCKED_KEYWORDS.test(`${a.action} ${a.why ?? ''} ${a.lane ?? ''}`));
   const report = await step13_generateReport(rawLeads, scoredLeads, outreachDrafts, contentDrafts, seoOpportunities, top3, errors);
 
   await step15_telegramBrief(report, top3, agentMailReplies, outreachDrafts).catch(e => console.log(`  Telegram failed: ${e}`));
