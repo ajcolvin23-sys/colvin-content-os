@@ -7,7 +7,7 @@ import { callClaudeJSON } from '@/lib/ai/claude'
 import { generateColvinInfographic } from '@/automation-os/scripts/gen-colvin-infographic'
 
 // Minimal evidence guard (mirrors the spirit of the daily-run hallucination scan).
-const CLAIM_PATTERNS = [/\b\d+% (?:increase|more|growth|roi|of (?:clients|customers))\b/i, /guaranteed?\b/i, /\$[\d,]+ (?:in revenue|saved|earned|profit)/i, /\bourstomers? (?:saw|got)\b/i]
+const CLAIM_PATTERNS = [/\b\d+% (?:increase|more|growth|roi|of (?:clients|customers))\b/i, /guaranteed?\b/i, /\$[\d,]+ (?:in revenue|saved|earned|profit)/i, /\bour customers? (?:saw|got)\b/i]
 function claimFlags(text: string): string[] {
   return CLAIM_PATTERNS.filter((re) => re.test(text)).map((re) => re.source)
 }

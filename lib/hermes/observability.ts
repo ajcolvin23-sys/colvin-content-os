@@ -28,10 +28,12 @@ async function loadRuns(): Promise<RawRun[]> {
     const { data, error } = await createAdminClient().from('agent_runs').select('agent, status, latency_ms, created_at').order('created_at', { ascending: false }).limit(2000)
     if (!error && data && data.length) return data as RawRun[]
   } catch { /* fall through */ }
-  // Local JSONL fallback (dev)
+  // Local JSONL fallback (dev). File is append-ordered (oldest→newest); reverse
+  // to newest-first so it matches the Supabase path (rs[0] = most recent run).
   try {
     const file = path.resolve(process.cwd(), 'logs/agent_runs.jsonl')
-    return fs.readFileSync(file, 'utf8').trim().split('\n').map((l) => { try { return JSON.parse(l) as RawRun } catch { return null } }).filter(Boolean) as RawRun[]
+    const rows = fs.readFileSync(file, 'utf8').trim().split('\n').map((l) => { try { return JSON.parse(l) as RawRun } catch { return null } }).filter(Boolean) as RawRun[]
+    return rows.reverse()
   } catch { return [] }
 }
 

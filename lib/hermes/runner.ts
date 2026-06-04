@@ -103,10 +103,20 @@ export async function runAgent<O = unknown>(
     return result
   }
 
+  // Validate input ONCE up front. A bad input is a caller error — fail fast,
+  // don't retry (it can never succeed) and don't count it against the breaker.
+  try {
+    validate(agent.inputSchema, input, `${name} input`)
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err)
+    const latencyMs = Date.now() - startedAt
+    await logRun({ run_id: runId, agent: name, lane: opts.lane ?? null, status: 'error', attempts: 0, latency_ms: latencyMs, error, parent: opts.parent ?? null, created_at: new Date().toISOString() })
+    return { agent: name, runId, ok: false, error, attempts: 0, latencyMs }
+  }
+
   let lastError = ''
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
-      validate(agent.inputSchema, input, `${name} input`)
       const output = await agent.run(input, ctx)
       validate(agent.outputSchema, output, `${name} output`)
 
