@@ -7,6 +7,7 @@ import * as https from 'https'
 import * as zlib from 'zlib'
 import { callClaudeJSON } from '@/lib/ai/claude'
 import type { Agent } from '../types'
+import { isBlockedSource, FREELANCE_EXCLUSION } from '@/lib/leadgen/blocked-sources'
 
 const BRAVE_KEY = process.env.BRAVE_SEARCH_API_KEY || ''
 
@@ -67,12 +68,18 @@ export const leadFinderAgent: Agent<FinderInput, { leads: Prospect[]; sources: n
     const max = input.max ?? 5
     const seen = new Set<string>()
     const results: SearchResult[] = []
+    let blocked = 0
     for (const q of input.queries) {
       const r = await braveSearch(q, max)
-      for (const x of r) if (!seen.has(x.url)) { seen.add(x.url); results.push(x) }
+      for (const x of r) {
+        if (seen.has(x.url)) continue
+        seen.add(x.url)
+        if (isBlockedSource(x.url)) { blocked++; continue } // freelance/gig/job sources — never
+        results.push(x)
+      }
       await new Promise((res) => setTimeout(res, 800))
     }
-    ctx.log(`gathered ${results.length} unique sources from ${input.queries.length} queries`)
+    ctx.log(`gathered ${results.length} unique sources (${blocked} blocked freelance/job) from ${input.queries.length} queries`)
     if (results.length === 0) return { leads: [], sources: 0 }
 
     const scrapedContext = results.slice(0, 8).map((r, i) => `[${i + 1}] ${r.title || 'Unknown'} — ${r.url}\n${r.description || ''}`).join('\n\n---\n\n')
@@ -80,7 +87,7 @@ export const leadFinderAgent: Agent<FinderInput, { leads: Prospect[]; sources: n
     const system = `You are Lead Scout for Alfred Colvin's business "${input.lane}" in Indianapolis.
 Extract real prospect profiles from the web research. ONLY use companies/people mentioned in the source material.
 Do NOT invent names. If a real person's name is not mentioned, leave name as null. Include any visible email, else null.
-Do NOT assign quality scores.${exclusion}
+Do NOT assign quality scores.${exclusion}${FREELANCE_EXCLUSION}
 Return JSON: { "leads": [ { "name": string|null, "company": string, "title": string|null, "linkedin_url": string|null, "email": string|null, "fit_reason": string, "source_url": string } ] }
 Max ${max} prospects.`
 

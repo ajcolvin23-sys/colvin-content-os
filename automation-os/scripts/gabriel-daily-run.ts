@@ -15,6 +15,7 @@ import * as https from 'https';
 import * as zlib from 'zlib';
 import { generateColvinInfographic } from './gen-colvin-infographic';
 import { runVideoStudio } from '../../lib/hermes/agents/remotion';
+import { isBlockedSource, FREELANCE_EXCLUSION } from '../../lib/leadgen/blocked-sources';
 
 // Load .env.local before any env var access
 const envPath = path.resolve(__dirname, '../../.env.local');
@@ -1046,18 +1047,11 @@ async function markAgentMailRead(inboxId: string, messageId: string): Promise<vo
   });
 }
 
-// ── Blocked domains — never use leads from these sources ─────────────────────
-const BLOCKED_DOMAINS = [
-  'upwork.com', 'freelancer.com', 'peopleperhour.com', 'fiverr.com',
-  'toptal.com', 'guru.com', 'bark.com', 'thumbtack.com', 'taskrabbit.com',
-  'indeed.com', 'ziprecruiter.com', 'glassdoor.com', 'monster.com',
-];
-
+// ── Blocked lead sources — freelance/gig marketplaces + job boards ───────────
+// Single source of truth: lib/leadgen/blocked-sources.ts (shared with the mesh
+// leads.finder agent so the rule can never drift). Stops Upwork/Fiverr/etc.
 function isBlockedDomain(url: string): boolean {
-  try {
-    const hostname = new URL(url).hostname.replace('www.', '');
-    return BLOCKED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
-  } catch { return false; }
+  return isBlockedSource(url);
 }
 
 // ── Lane search query definitions — targets: LinkedIn, Reddit, Facebook, Instagram, TikTok, business sites
@@ -1312,7 +1306,7 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
 Extract real prospect profiles from the web research below. ONLY use companies and people mentioned in the source material.
 Do NOT invent names. If a real person's name is not mentioned, leave name as null.
 If an email address is visible in the content, include it in the email field. Otherwise leave email as null.
-Do NOT assign quality scores — that is a separate step.${competitorRule}
+Do NOT assign quality scores — that is a separate step.${competitorRule}${FREELANCE_EXCLUSION}
 Return JSON array. Each item: { name (string|null), company, title (string|null), linkedin_url (string|null), email (string|null), fit_reason, source_url }.
 Max ${config.lead_scout.max_leads_per_lane_per_run} prospects.`;
 
