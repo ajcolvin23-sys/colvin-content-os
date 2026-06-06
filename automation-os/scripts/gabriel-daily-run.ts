@@ -16,6 +16,7 @@ import * as zlib from 'zlib';
 import { generateColvinInfographic } from './gen-colvin-infographic';
 import { runVideoStudio } from '../../lib/hermes/agents/remotion';
 import { isBlockedSource, FREELANCE_EXCLUSION, scrubBlockedLines, BLOCKED_KEYWORDS } from '../../lib/leadgen/blocked-sources';
+import { uploadPublicAsset } from '../../lib/storage/upload-asset';
 
 // Load .env.local before any env var access
 const envPath = path.resolve(__dirname, '../../.env.local');
@@ -2098,8 +2099,13 @@ async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> 
         });
         const caption = (info.caption ?? '').trim();
         const tags = (info.hashtags ?? []).map(h => h.startsWith('#') ? h : `#${h}`).join(' ');
+
+        // Upload the PNG to durable public storage so it survives the ephemeral CI
+        // run and is retrievable/displayable at /approvals (local out/ folder is lost).
+        const mediaUrl = await uploadPublicAsset(supabase, pngPath, 'infographics');
+
         const draftBody = [
-          `🖼 Infographic image: ${pngPath}`,
+          mediaUrl ? `🖼 Infographic image: ${mediaUrl}` : `🖼 Infographic image (local): ${pngPath}`,
           ``,
           `Topic: ${info.title_line1} ${info.title_line2}`,
           ``,
@@ -2117,9 +2123,9 @@ async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> 
             draft: draftBody, character_count: draftBody.length,
             review_required: true, status: 'pending_review',
             katrina_review_required: isKatrinaLane,
-            image_path: pngPath,
-          } as ContentDraft & { katrina_review_required?: boolean; image_path?: string });
-          console.log(`  ${targetLane}: ✓ Infographic PNG → ${path.basename(pngPath)} (Topic: "${info.title_line1} ${info.title_line2}")`);
+            image_path: pngPath, media_url: mediaUrl ?? undefined,
+          } as ContentDraft & { katrina_review_required?: boolean; image_path?: string; media_url?: string });
+          console.log(`  ${targetLane}: ✓ Infographic ${mediaUrl ? 'uploaded → ' + mediaUrl : 'PNG → ' + path.basename(pngPath)} (Topic: "${info.title_line1} ${info.title_line2}")`);
         }
       } catch (err) {
         console.log(`  ${targetLane}: Infographic gen failed — ${String(err).slice(0, 200)}`);
@@ -3064,12 +3070,20 @@ async function step12_saveOutputs(
           title: `[${d.lane}] ${d.platform} ${d.content_type} — ${TODAY}${isKatrina ? ' [katrina_review]' : ''}`,
           hook: firstLine.slice(0, 300),
           body: d.draft,
+          media_url: (d as ContentDraft & { media_url?: string }).media_url ?? null,
           status: 'needs_review',
           generation_model: CONTENT_GEN_MODEL,
           created_at: new Date().toISOString(),
         };
       });
-      const { error: ciError } = await supabase.from('content_items').insert(itemsToInsert);
+      let { error: ciError } = await supabase.from('content_items').insert(itemsToInsert);
+      // Self-heal: if the media_url column hasn't been added yet, retry without it
+      // (the image URL is also in the draft body, so nothing is lost).
+      if (ciError && /media_url/i.test(ciError.message)) {
+        console.log('  (media_url column not present yet — retrying insert without it; apply migration 20260606_content_media_url.sql to enable structured image display)');
+        const stripped = itemsToInsert.map(({ media_url, ...rest }) => rest);
+        ({ error: ciError } = await supabase.from('content_items').insert(stripped));
+      }
       if (ciError) console.log(`  Content items Supabase warning: ${ciError.message}`);
       else console.log(`  Saved ${itemsToInsert.length} content drafts to Supabase (visible at /approvals)`);
     } catch (err) {
