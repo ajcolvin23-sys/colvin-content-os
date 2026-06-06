@@ -13,6 +13,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as zlib from 'zlib';
+import { generateColvinInfographic } from './gen-colvin-infographic';
+import { runVideoStudio } from '../../lib/hermes/agents/remotion';
+import { isBlockedSource, FREELANCE_EXCLUSION, scrubBlockedLines, BLOCKED_KEYWORDS } from '../../lib/leadgen/blocked-sources';
 
 // Load .env.local before any env var access
 const envPath = path.resolve(__dirname, '../../.env.local');
@@ -1044,18 +1047,11 @@ async function markAgentMailRead(inboxId: string, messageId: string): Promise<vo
   });
 }
 
-// ── Blocked domains — never use leads from these sources ─────────────────────
-const BLOCKED_DOMAINS = [
-  'upwork.com', 'freelancer.com', 'peopleperhour.com', 'fiverr.com',
-  'toptal.com', 'guru.com', 'bark.com', 'thumbtack.com', 'taskrabbit.com',
-  'indeed.com', 'ziprecruiter.com', 'glassdoor.com', 'monster.com',
-];
-
+// ── Blocked lead sources — freelance/gig marketplaces + job boards ───────────
+// Single source of truth: lib/leadgen/blocked-sources.ts (shared with the mesh
+// leads.finder agent so the rule can never drift). Stops Upwork/Fiverr/etc.
 function isBlockedDomain(url: string): boolean {
-  try {
-    const hostname = new URL(url).hostname.replace('www.', '');
-    return BLOCKED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
-  } catch { return false; }
+  return isBlockedSource(url);
 }
 
 // ── Lane search query definitions — targets: LinkedIn, Reddit, Facebook, Instagram, TikTok, business sites
@@ -1310,7 +1306,7 @@ async function step3_leadScout(config: GabrielConfig): Promise<Lead[]> {
 Extract real prospect profiles from the web research below. ONLY use companies and people mentioned in the source material.
 Do NOT invent names. If a real person's name is not mentioned, leave name as null.
 If an email address is visible in the content, include it in the email field. Otherwise leave email as null.
-Do NOT assign quality scores — that is a separate step.${competitorRule}
+Do NOT assign quality scores — that is a separate step.${competitorRule}${FREELANCE_EXCLUSION}
 Return JSON array. Each item: { name (string|null), company, title (string|null), linkedin_url (string|null), email (string|null), fit_reason, source_url }.
 Max ${config.lead_scout.max_leads_per_lane_per_run} prospects.`;
 
@@ -1914,6 +1910,145 @@ function scanForSpamWords(draft: string): string[] {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LinkedIn Research Studio — colvin_enterprises visual content engine
+// ═══════════════════════════════════════════════════════════════════════════════
+// Produces a research-driven, highly shareable LinkedIn carousel/infographic with a
+// full Canva design brief, AI image prompt, caption, engagement assets, and a lead
+// magnet — gated by a 6-axis self-score (reject < 8). NO video. NO Reels. NO YouTube.
+// Spec: automation-os/gabriel/skills/colvin-linkedin-research-studio/SKILL.md
+async function generateLinkedInVisualStudio(
+  config: GabrielConfig,
+  lane: string,
+  strategy: { transformation?: string; rung_label?: string; focus_note?: string; cta_link?: string } | undefined,
+  hook: string | null,
+  cta: string,
+): Promise<string | null> {
+  const transformation = strategy?.transformation ?? '';
+  const rungLabel = strategy?.rung_label ?? 'current offer';
+  const ctaLink = strategy?.cta_link ?? '';
+
+  const PILLARS = 'AI Agents, Business Automation, Church Technology, Nonprofit Technology, Financial Advisor Technology, AI Productivity, CRM Systems, AI Workflows, Business Growth Systems, Lead Generation Systems, AI for Ministry, AI for Education, AI Infrastructure, Future of Work, AI Research';
+
+  const system = `You are an elite LinkedIn Growth Strategist, Research Analyst, Information Designer, and AI Content Architect for Colvin Enterprises (Alfred Colvin, Indianapolis AI consultant).
+
+Your ONLY output is a HIGHLY SHAREABLE LinkedIn CAROUSEL or INFOGRAPHIC. NEVER video, Reels, or YouTube.
+Every piece must look like it belongs on the feeds of Harvard Business Review, McKinsey, OpenAI, Anthropic, HubSpot, or Morning Brew.
+
+AUDIENCE — Primary: churches, nonprofits, financial advisors, insurance agents, small businesses, local service businesses. Secondary: entrepreneurs, coaches, consultants, community orgs.
+CONTENT PILLARS (pick one focus): ${PILLARS}.
+
+MANDATORY: teach something, contain a framework, contain a visual, contain practical implementation, contain a CTA, contain a lead-generation angle, deliver business value. No fluff. No motivational filler. No generic AI news. Content people SAVE.
+
+EVIDENCE RULE: Zero fabricated client names, revenue numbers, or invented ROI. Label any outcome as "[example scenario]". Statistics must be plausible and labeled as illustrative if not sourced.
+
+Produce the full studio deliverable in ONE pass, following these steps:
+1. RESEARCH SUMMARY — latest trends, tools, common mistakes, emerging opportunities, frameworks, stats, industry shifts (5-8 bullets).
+2. FORMAT CHOICE — choose ONE: Carousel, Infographic, Comparison Chart, Framework Diagram, Decision Tree, Workflow Diagram, Checklist Graphic, Research Report Graphic, Agent Architecture Graphic, Process Map. Explain WHY in 1-2 sentences.
+3. CONTENT STRUCTURE — Slide 1 = Hook; Slides 2-9 = Value; Final slide = CTA. (For infographic: Title, Sections, Key Takeaways, CTA.)
+4. CANVA DESIGN BRIEF — canvas size, typography, color palette (hex), icons, layout, spacing, visual hierarchy, image + graphic recommendations, design style.
+5. AI IMAGE PROMPT — a detailed prompt usable in ChatGPT Images / Midjourney / Ideogram / Flux.
+6. LINKEDIN CAPTION — Hook, Problem, Insight, Framework, CTA, 3-5 hashtags.
+7. ENGAGEMENT ASSETS — 10 comments Alfred can leave, 5 poll ideas, 5 follow-up post ideas, 5 newsletter ideas.
+8. LEAD MAGNET — one checklist/PDF/guide/audit/assessment/calculator/template that converts readers to leads.
+9. SELF-SCORE — score 1-10 on Shareability, Saveability, Authority, Lead Generation, Visual Appeal, Novelty. If ANY axis < 8, silently improve before returning. Only return work where all six are 8+.
+
+Use this exact hook on Slide 1 verbatim: "${hook ?? 'Most teams automate the wrong thing first.'}"
+Tie the CTA to: "${cta}"${ctaLink ? ` (link: ${ctaLink})` : ''}.
+Transformation sold: "${transformation}". Current focus: ${rungLabel}.
+
+Return ONLY JSON:
+{
+  "format": string,
+  "format_reason": string,
+  "research_summary": string[],
+  "slides": [ { "n": number, "role": "HOOK"|"VALUE"|"CTA", "headline": string, "body": string, "design_note": string } ],
+  "canva_brief": { "canvas": string, "typography": string, "palette": string[], "icons": string, "layout": string, "visual_hierarchy": string, "style": string },
+  "ai_image_prompt": string,
+  "caption": string,
+  "hashtags": string[],
+  "engagement": { "comments": string[], "polls": string[], "followups": string[], "newsletters": string[] },
+  "lead_magnet": { "type": string, "title": string, "why_it_converts": string },
+  "scores": { "shareability": number, "saveability": number, "authority": number, "lead_generation": number, "visual_appeal": number, "novelty": number }
+}`;
+
+  const raw = await callGPT(
+    config.model_routing.content_generation,
+    system,
+    `Create today's Colvin Enterprises LinkedIn visual deliverable for ${lane} (${TODAY}). Pick the highest-leverage pillar for the primary audience. No fabricated proof.`,
+    { taskType: 'content_generation', lane, maxTokens: 8000 },
+  );
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch {
+    return null;
+  }
+
+  // Scoring gate — reject anything below 8 on any axis
+  const s = (parsed.scores ?? {}) as Record<string, number>;
+  const axes = ['shareability', 'saveability', 'authority', 'lead_generation', 'visual_appeal', 'novelty'];
+  const below = axes.filter(a => (Number(s[a]) || 0) < 8);
+  if (below.length > 0) {
+    console.log(`  ⚠️  ${lane} Visual Studio: scored < 8 on [${below.join(', ')}] — rejected`);
+    return null;
+  }
+
+  // Flatten to a reviewable markdown brief stored as the content draft
+  const slides = (parsed.slides ?? []) as Array<{ n: number; role: string; headline: string; body: string; design_note: string }>;
+  const cb = (parsed.canva_brief ?? {}) as Record<string, unknown>;
+  const eng = (parsed.engagement ?? {}) as Record<string, string[]>;
+  const lm = (parsed.lead_magnet ?? {}) as Record<string, string>;
+  const list = (arr?: string[]) => (arr ?? []).map(x => `  • ${x}`).join('\n');
+
+  const md = [
+    `# Colvin Enterprises — LinkedIn ${parsed.format ?? 'Carousel'}`,
+    `_Why this format:_ ${parsed.format_reason ?? ''}`,
+    ``,
+    `## Research Summary`,
+    list(parsed.research_summary as string[]),
+    ``,
+    `## Slides`,
+    slides.map(sl => `**Slide ${sl.n} — ${sl.role}**\n${sl.headline}\n${sl.body}\n_Design:_ ${sl.design_note}`).join('\n\n'),
+    ``,
+    `## Canva Design Brief`,
+    `- Canvas: ${cb.canvas ?? ''}`,
+    `- Typography: ${cb.typography ?? ''}`,
+    `- Palette: ${Array.isArray(cb.palette) ? (cb.palette as string[]).join(', ') : ''}`,
+    `- Icons: ${cb.icons ?? ''}`,
+    `- Layout: ${cb.layout ?? ''}`,
+    `- Visual hierarchy: ${cb.visual_hierarchy ?? ''}`,
+    `- Style: ${cb.style ?? ''}`,
+    ``,
+    `## AI Image Prompt`,
+    String(parsed.ai_image_prompt ?? ''),
+    ``,
+    `## LinkedIn Caption`,
+    String(parsed.caption ?? ''),
+    (parsed.hashtags as string[])?.length ? `\n${(parsed.hashtags as string[]).map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}` : '',
+    ``,
+    `## Engagement Assets`,
+    `**10 comments to leave:**\n${list(eng.comments)}`,
+    `**5 poll ideas:**\n${list(eng.polls)}`,
+    `**5 follow-up posts:**\n${list(eng.followups)}`,
+    `**5 newsletter ideas:**\n${list(eng.newsletters)}`,
+    ``,
+    `## Lead Magnet`,
+    `**${lm.type ?? ''}: ${lm.title ?? ''}** — ${lm.why_it_converts ?? ''}`,
+    ``,
+    `_Scores (all ≥8): shareability ${s.shareability}, saveability ${s.saveability}, authority ${s.authority}, lead-gen ${s.lead_generation}, visual ${s.visual_appeal}, novelty ${s.novelty}_`,
+  ].filter(l => l !== '').join('\n');
+
+  // Final evidence scan on the caption text
+  if (scanForHallucinations(String(parsed.caption ?? '')).length > 0) {
+    console.log(`  ⚠️  ${lane} Visual Studio: caption flagged by evidence scanner — rejected`);
+    return null;
+  }
+
+  return md;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // STEP 5 — Content Generation (DRAFTS ONLY)
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── Hook-Story-Offer content engine ─────────────────────────────────────────
@@ -1945,7 +2080,52 @@ async function step5_contentGen(config: GabrielConfig): Promise<ContentDraft[]> 
     const wantsFacebook = lanePlatforms.includes('facebook');
     const wantsTikTok = lanePlatforms.includes('tiktok');
 
-    console.log(`  [${targetLane}] Rung: ${rungLabel} | Platforms: ${lanePlatforms.join('+')}${isKatrinaLane ? ' [katrina_review]' : ''}`);
+    const contentMode = (strategy as { content_mode?: string })?.content_mode;
+    const isVisualStudio = contentMode === 'linkedin_visual_studio';
+
+    console.log(`  [${targetLane}] Rung: ${rungLabel} | Platforms: ${lanePlatforms.join('+')}${isVisualStudio ? ' [linkedin_visual_studio]' : ''}${isKatrinaLane ? ' [katrina_review]' : ''}`);
+
+    // ── LinkedIn Visual Studio mode (colvin_enterprises) ─────────────────────
+    // No video. Renders a single branded INFOGRAPHIC PNG (navy+gold Colvin poster)
+    // with a FRESH topic every day (topic-history guard prevents repeats), plus a
+    // ready-to-post caption. Skips the generic post/facebook/video/carousel blocks.
+    if (isVisualStudio) {
+      try {
+        const outDir = path.resolve(__dirname, '../../out/colvin-previews');
+        const { info, pngPath } = await generateColvinInfographic({
+          model: config.model_routing.content_generation,
+          cta, dateStr: TODAY, outDir,
+        });
+        const caption = (info.caption ?? '').trim();
+        const tags = (info.hashtags ?? []).map(h => h.startsWith('#') ? h : `#${h}`).join(' ');
+        const draftBody = [
+          `🖼 Infographic image: ${pngPath}`,
+          ``,
+          `Topic: ${info.title_line1} ${info.title_line2}`,
+          ``,
+          `── LinkedIn caption ──`,
+          caption,
+          tags ? `\n${tags}` : '',
+        ].filter(Boolean).join('\n');
+
+        // Evidence scan on the caption only (image text is template-controlled)
+        if (scanForHallucinations(caption).length > 0) {
+          console.log(`  ${targetLane}: ✗ infographic caption flagged by evidence scanner — skipped`);
+        } else {
+          drafts.push({
+            lane: targetLane, platform: 'linkedin', content_type: 'infographic',
+            draft: draftBody, character_count: draftBody.length,
+            review_required: true, status: 'pending_review',
+            katrina_review_required: isKatrinaLane,
+            image_path: pngPath,
+          } as ContentDraft & { katrina_review_required?: boolean; image_path?: string });
+          console.log(`  ${targetLane}: ✓ Infographic PNG → ${path.basename(pngPath)} (Topic: "${info.title_line1} ${info.title_line2}")`);
+        }
+      } catch (err) {
+        console.log(`  ${targetLane}: Infographic gen failed — ${String(err).slice(0, 200)}`);
+      }
+      continue; // colvin is LinkedIn-infographic only — never falls through to video/generic blocks
+    }
 
     try {
       // ── LinkedIn — Hook-Story-Offer, 900–1300 chars ──────────────────────
@@ -2076,6 +2256,45 @@ Return JSON: { draft: string }`;
         } catch (e) {
           if ((e as { __skipVideo?: boolean })?.__skipVideo) throw e;
           // query failed — proceed with generation rather than block content
+        }
+
+        // ── Video Studio — DEFAULT video engine (Hermes Remotion Studio) ─────
+        // The 7 QA-gated agents HARD-ENFORCE the locked 6-scene cinematic structure
+        // (hook→pain_stack→desire→mechanism→transformation→cta) with brand photo
+        // direction. A video that isn't cinematic is REJECTED, never shipped.
+        // Set VIDEO_ENGINE=legacy only to fall back to the inline generator below.
+        if (process.env.VIDEO_ENGINE !== 'legacy') {
+          const studio = await runVideoStudio({
+            lane: targetLane, platform: 'tiktok',
+            hook: hook ?? 'Most people have this wrong.',
+            transformation, rung_label: rungLabel, cta,
+          });
+          if (studio.ok && studio.blueprint) {
+            const bp = studio.blueprint as Record<string, unknown>;
+            bp.video_id = videoId; // keep day/run id convention so dedup + render line up
+            const videosDir = path.join(__dirname, '../../videos');
+            if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
+            fs.writeFileSync(path.join(videosDir, `${videoId}.json`), JSON.stringify(bp, null, 2));
+            try {
+              await supabase.from('video_projects').insert({
+                title: bp.title, lane: targetLane, platform: 'tiktok', aspect_ratio: '9:16',
+                render_status: 'draft', voiceover_script: bp.voiceover_script, render_settings: bp,
+              });
+            } catch { /* non-fatal — JSON is source of truth */ }
+            const readable = `[Hermes Video Studio] ${bp.title}\n📁 videos/${videoId}.json — 6-scene cinematic, QA-passed`;
+            drafts.push({
+              lane: targetLane, platform: 'tiktok', content_type: 'video_script',
+              draft: readable, character_count: readable.length,
+              review_required: true, status: 'pending_review',
+              katrina_review_required: isKatrinaLane, video_script_id: videoId,
+            } as ContentDraft & { katrina_review_required?: boolean; video_script_id?: string });
+            console.log(`  ${targetLane}: ✓ video via Hermes Studio → videos/${videoId}.json`);
+          } else {
+            // NEVER fall back to the generic inline generator — skip instead, so a
+            // generic video can never ship. The studio failing is logged for review.
+            console.log(`  ${targetLane}: ✗ video SKIPPED — studio QA rejected it (${studio.issues.join('; ')}). No generic fallback.`);
+          }
+          throw { __skipVideo: true }; // studio is authoritative — never run the inline generator
         }
 
         // ── CINEMATIC 6-SCENE STRUCTURE (LOCKED UPGRADE 010) ─────────────────
@@ -3028,7 +3247,12 @@ async function step15_telegramBrief(
       : '',
   ].filter(Boolean).join('\n');
 
-  await sendTelegram(brief);
+  // Final safety net: never let a freelance/gig/job-platform mention reach Telegram,
+  // even from old carry-forward data. Source filtering already keeps them out of the
+  // pipeline; this guarantees the brief is clean too.
+  const safeBrief = scrubBlockedLines(brief);
+
+  await sendTelegram(safeBrief);
   console.log('  Telegram brief sent.');
 
   // Separate Katrina notification — ONLY fires when compliance-lane items exist
@@ -3175,7 +3399,10 @@ async function main() {
   await step12_saveOutputs(scoredLeads, outreachDrafts, contentDrafts, seoReports, marketingRecs).catch(e => errors.push(`Step 12: ${e}`));
 
   // Steps 13–15 (report + deliver)
-  const top3 = await step14_top3Actions(outreach, content, seo, config, memory.carry_forward).catch(e => { errors.push(`Step 14: ${e}`); return []; });
+  const top3Raw = await step14_top3Actions(outreach, content, seo, config, memory.carry_forward).catch(e => { errors.push(`Step 14: ${e}`); return []; });
+  // Drop any action that references a freelance/gig/job platform so neither the
+  // Telegram nor the email brief ever surfaces a blocked source.
+  const top3 = top3Raw.filter(a => !BLOCKED_KEYWORDS.test(`${a.action} ${a.why ?? ''} ${a.lane ?? ''}`));
   const report = await step13_generateReport(rawLeads, scoredLeads, outreachDrafts, contentDrafts, seoOpportunities, top3, errors);
 
   await step15_telegramBrief(report, top3, agentMailReplies, outreachDrafts).catch(e => console.log(`  Telegram failed: ${e}`));

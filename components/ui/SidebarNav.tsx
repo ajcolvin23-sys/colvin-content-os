@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutGrid, Users, CheckSquare, DollarSign, Megaphone, FileText,
-  BookOpen, Zap, Workflow, Send, ShieldCheck, Bot, Settings, Sunrise,
+  BookOpen, Zap, Workflow, Send, ShieldCheck, Bot, Settings, Sunrise, Network,
 } from 'lucide-react'
 import { HubScopeSelector } from '@/components/hermes/HubScopeSelector'
 import type { HubNavItem } from '@/lib/crm/hub-config'
@@ -39,6 +39,7 @@ const GLOBAL_NAV = [
   { href: '/outreach', label: 'Outreach', icon: Send },
   { href: '/approvals', label: 'Approvals', icon: ShieldCheck },
   { href: '/agent-logs', label: 'Agent Logs', icon: Bot },
+  { href: '/mesh', label: 'Agent Mesh', icon: Network },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

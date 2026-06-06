@@ -61,3 +61,8 @@ logs/
 out/
 videos/*.json
 videos/*.mp4
+
+# Generated render audio (per-run voiceover/music)
+public/audio/
+# Agent infographic topic history (runtime state)
+automation-os/data/colvin-infographic-history.json

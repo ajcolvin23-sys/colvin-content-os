@@ -163,93 +163,16 @@ function buildSlides(content: GeneratedContent) {
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  // Verify cron secret
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const supabase = createAdminClient()
-  const dateStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
-
-  try {
-    // Check if we already generated for today
-    const { data: existing } = await supabase
-      .from('video_projects')
-      .select('id')
-      .eq('lane', 'first_keys_indy')
-      .gte('created_at', `${dateStr}T00:00:00Z`)
-      .single()
-
-    if (existing) {
-      return NextResponse.json({
-        message: 'Already generated for today',
-        project_id: existing.id,
-        date: dateStr
-      })
-    }
-
-    // Generate content
-    const content = await generateDailyContent(dateStr)
-    const { slides, totalFrames } = buildSlides(content)
-
-    // Save to Supabase
-    const { data: project, error } = await supabase
-      .from('video_projects')
-      .insert({
-        title: `[First Keys Indy Daily] ${content.topic} — ${dateStr}`,
-        lane: 'first_keys_indy',
-        platform: 'tiktok',
-        aspect_ratio: '9:16',
-        render_status: 'content_ready',
-        voiceover_script: content.caption,
-        render_settings: {
-          slides,
-          totalFrames,
-          topic: content.topic,
-          angle: content.angle,
-          caption: content.caption,
-          hashtags: content.hashtags,
-          tiktokSound: content.tiktokSound,
-          date: dateStr,
-        },
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('[daily-video] Supabase error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    // Insert slide records
-    const slideRows = slides.map((s, i) => ({
-      video_project_id: project.id,
-      slide_order: i + 1,
-      text_on_screen: s.headline,
-      voiceover_text: s.sub || s.headline,
-      duration_seconds: s.durationInFrames / 30,
-      transition: 'fade',
-      slide_type: 'text',
-    }))
-
-    await supabase.from('video_slides').insert(slideRows)
-
-    console.log(`[daily-video] Generated project ${project.id}: ${content.topic}`)
-
-    return NextResponse.json({
-      success: true,
-      project_id: project.id,
-      topic: content.topic,
-      angle: content.angle,
-      slide_count: slides.length,
-      total_seconds: totalFrames / 30,
-      date: dateStr,
-    })
-  } catch (err) {
-    console.error('[daily-video] Error:', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
-  }
+  // ── DEPRECATED 2026-06-06 ───────────────────────────────────────────────────
+  // This route generated GENERIC text-slide videos (headline/sub on solid colors,
+  // no cinematic scenes, no images, no voiceover). First Keys Indy video is now
+  // produced by gabriel:daily's Hermes Video Studio, which HARD-ENFORCES the
+  // locked 6-scene cinematic structure with brand photo direction + voiceover.
+  // Disabled so a generic video can never be generated again.
+  return NextResponse.json({
+    deprecated: true,
+    message: 'Generic text-slide video generation is disabled. First Keys Indy video is now produced by the cinematic Hermes Video Studio via gabriel:daily.',
+  }, { status: 410 })
 }
 
 // GET — fetch today's generated content (used by render script)

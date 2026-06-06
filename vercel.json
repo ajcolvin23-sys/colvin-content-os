@@ -5,10 +5,6 @@
       "schedule": "0 13 * * *"
     },
     {
-      "path": "/api/daily-video",
-      "schedule": "0 9 * * *"
-    },
-    {
       "path": "/api/cron/weekly-trends",
       "schedule": "0 20 * * 0"
     },
