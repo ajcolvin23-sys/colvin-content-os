@@ -12,6 +12,8 @@
 // LOCKED UPGRADE 010: 6-scene cinematic structure
 //   hook → pain_stack → desire → mechanism → transformation → cta  (do not revert)
 
+import * as fs from 'fs'
+import * as path from 'path'
 import { randomUUID } from 'crypto'
 import { callClaudeJSON } from '@/lib/ai/claude'
 import type { Agent } from '../types'
@@ -19,6 +21,23 @@ import { runPipeline } from '../index'
 import { registerAll, hasAgent } from '../registry'
 
 const FPS = 30
+
+// ── Video topic-history guard ────────────────────────────────────────────────
+// Records each rendered video's theme per lane so the next run avoids repeating
+// it — themes never repeat across days, not just hooks. Mirrors the infographic
+// engine's fresh-topic guard.
+const VIDEO_HISTORY = path.join(process.cwd(), 'automation-os/data/video-topic-history.json')
+function readVideoHistory(): Array<{ date: string; lane: string; title: string }> {
+  try { return JSON.parse(fs.readFileSync(VIDEO_HISTORY, 'utf8')) } catch { return [] }
+}
+function recentVideoTitles(lane: string, n = 14): string[] {
+  return readVideoHistory().filter((h) => h.lane === lane).slice(-n).map((h) => h.title)
+}
+function appendVideoHistory(lane: string, title: string): void {
+  const hist = readVideoHistory()
+  hist.push({ date: new Date().toISOString().slice(0, 10), lane, title })
+  try { fs.mkdirSync(path.dirname(VIDEO_HISTORY), { recursive: true }); fs.writeFileSync(VIDEO_HISTORY, JSON.stringify(hist.slice(-120), null, 2)) } catch { /* non-fatal */ }
+}
 const SIX_SCENES = ['hook', 'pain_stack', 'desire', 'mechanism', 'transformation', 'cta'] as const
 
 const VOICE_BY_LANE: Record<string, string> = {
@@ -41,6 +60,7 @@ interface StudioInput {
   transformation?: string
   rung_label?: string
   cta: string
+  recentTopics?: string[]   // recent video titles to avoid repeating (topic-history guard)
 }
 interface Scene {
   type: string
@@ -86,7 +106,7 @@ export const scriptWriterAgent: Agent<StudioInput, ScriptOut> = {
 
 Voice: warm, direct, Indianapolis. NO fabricated stats/clients/ROI — label any outcome "[example]".
 Hook (verbatim scene 1): "${input.hook}"
-Transformation being sold: "${input.transformation ?? ''}". Offer/rung: ${input.rung_label ?? ''}. CTA: "${input.cta}".
+Transformation being sold: "${input.transformation ?? ''}". Offer/rung: ${input.rung_label ?? ''}. CTA: "${input.cta}".${(input.recentTopics && input.recentTopics.length) ? `\n\nAVOID repeating these recent video themes (pick a genuinely different angle/topic):\n${input.recentTopics.map((t) => `- ${t}`).join('\n')}` : ''}
 
 Return ONLY JSON:
 { "title": string, "voiceover_script": string,
@@ -271,6 +291,8 @@ export interface StudioResult { ok: boolean; issues: string[]; blueprint: Record
  */
 export async function runVideoStudio(input: StudioInput): Promise<StudioResult> {
   registerRemotionStudio()
+  // Topic-history guard: tell the script-writer which recent themes to avoid.
+  const studioInput: StudioInput = { ...input, recentTopics: input.recentTopics ?? recentVideoTitles(input.lane) }
   const result = await runPipeline(
     [
       { agent: 'remotion.script-writer' },
@@ -283,13 +305,16 @@ export async function runVideoStudio(input: StudioInput): Promise<StudioResult> 
       { agent: 'remotion.video-agent', map: (acc) => ({ script: acc['remotion.caption-timing'], template: acc['remotion.template'] }) },
       { agent: 'remotion.render-qa', map: (acc) => acc['remotion.video-agent'] },
     ],
-    input,
+    studioInput,
     { name: 'remotion.studio', lane: input.lane },
   )
 
   const qa = result.outputs['remotion.render-qa'] as { ok: boolean; issues: string[]; blueprint: Record<string, unknown> } | undefined
+  const ok = Boolean(result.ok && qa?.ok)
+  // Record the theme so tomorrow's run avoids it (only on a passing video).
+  if (ok && qa?.blueprint) appendVideoHistory(input.lane, String((qa.blueprint as { title?: string }).title ?? ''))
   return {
-    ok: Boolean(result.ok && qa?.ok),
+    ok,
     issues: qa?.issues ?? ['pipeline failed before QA'],
     blueprint: qa?.ok ? qa.blueprint : null,
     runId: result.runId,

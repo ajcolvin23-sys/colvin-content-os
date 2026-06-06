@@ -66,3 +66,5 @@ videos/*.mp4
 public/audio/
 # Agent infographic topic history (runtime state)
 automation-os/data/colvin-infographic-history.json
+# Video topic history (runtime state)
+automation-os/data/video-topic-history.json
