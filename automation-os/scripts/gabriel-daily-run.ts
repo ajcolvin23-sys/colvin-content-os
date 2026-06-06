@@ -2258,11 +2258,12 @@ Return JSON: { draft: string }`;
           // query failed — proceed with generation rather than block content
         }
 
-        // ── Video Studio cutover (Phase 1 agent mesh) — behind a flag ────────
-        // VIDEO_ENGINE=studio routes video generation through the Hermes Remotion
-        // Studio (7 QA-gated agents). Default stays the inline generator below
-        // (strangler-fig — gabriel:daily is unchanged unless the flag is set).
-        if (process.env.VIDEO_ENGINE === 'studio') {
+        // ── Video Studio — DEFAULT video engine (Hermes Remotion Studio) ─────
+        // The 7 QA-gated agents HARD-ENFORCE the locked 6-scene cinematic structure
+        // (hook→pain_stack→desire→mechanism→transformation→cta) with brand photo
+        // direction. A video that isn't cinematic is REJECTED, never shipped.
+        // Set VIDEO_ENGINE=legacy only to fall back to the inline generator below.
+        if (process.env.VIDEO_ENGINE !== 'legacy') {
           const studio = await runVideoStudio({
             lane: targetLane, platform: 'tiktok',
             hook: hook ?? 'Most people have this wrong.',
@@ -2288,9 +2289,12 @@ Return JSON: { draft: string }`;
               katrina_review_required: isKatrinaLane, video_script_id: videoId,
             } as ContentDraft & { katrina_review_required?: boolean; video_script_id?: string });
             console.log(`  ${targetLane}: ✓ video via Hermes Studio → videos/${videoId}.json`);
-            throw { __skipVideo: true }; // skip the inline generator below (sentinel ignored by outer catch)
+          } else {
+            // NEVER fall back to the generic inline generator — skip instead, so a
+            // generic video can never ship. The studio failing is logged for review.
+            console.log(`  ${targetLane}: ✗ video SKIPPED — studio QA rejected it (${studio.issues.join('; ')}). No generic fallback.`);
           }
-          console.log(`  ${targetLane}: studio QA failed (${studio.issues.join('; ')}) — falling back to inline generator`);
+          throw { __skipVideo: true }; // studio is authoritative — never run the inline generator
         }
 
         // ── CINEMATIC 6-SCENE STRUCTURE (LOCKED UPGRADE 010) ─────────────────

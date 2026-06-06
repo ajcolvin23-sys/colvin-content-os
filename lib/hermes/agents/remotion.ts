@@ -125,15 +125,36 @@ export const scenePlannerAgent: Agent<ScriptOut, ScriptOut & { duration_seconds:
   },
 }
 
+// Per-lane cinematic photo direction (matches gabriel:daily's PHOTO_DIRECTION).
+// problem scenes = hook/pain_stack; solution scenes = desire/mechanism/transformation/cta.
+const PROBLEM_TYPES = new Set(['hook', 'pain_stack', 'problem'])
+const LANE_PHOTO: Record<string, { problem: string; solution: string }> = {
+  first_keys_indy: {
+    problem: 'Cinematic portrait of a Black woman in her 30s, exhausted and worried, sitting in a dim Indianapolis apartment — cold blue side light, raw emotional documentary photography, photorealistic. ALL photos feature Black people.',
+    solution: 'Cinematic portrait of a joyful Black family holding house keys outside their first Indianapolis home, tears of joy, warm golden-hour sunlight, shallow depth of field, photorealistic. ALL photos feature Black people.',
+  },
+  colvin_enterprises: {
+    problem: 'Cinematic close-up of a Black businessman, exhausted, head in hands at a cluttered desk, dark late-night office, harsh blue monitor glow, deep moody shadows, photorealistic.',
+    solution: 'Cinematic portrait of a confident Black entrepreneur, relaxed genuine smile, bright modern Indianapolis office, warm golden morning sunlight, clean desk, sense of peace and mastery, photorealistic.',
+  },
+  music_theory_secrets: {
+    problem: 'Cinematic close-up of a Black musician at a church piano, frustrated confused expression at sheet music, dramatic directional side light through stained glass, photorealistic.',
+    solution: 'Cinematic portrait of a Black gospel pianist, eyes closed in pure joy, playing keyboard on a warm glowing church stage, warm amber stage lights, deep confidence, photorealistic.',
+  },
+}
+const DEFAULT_PHOTO = { problem: 'Cinematic portrait of an overwhelmed person, cold dramatic side light, photorealistic.', solution: 'Cinematic portrait of a confident relaxed person, warm golden light, photorealistic.' }
+
 // ── 3) Asset Manifest (deterministic) — describe needed images ───────────────
 export const assetManifestAgent: Agent<ScriptOut & { duration_seconds: number }, ScriptOut & { duration_seconds: number }> = {
   name: 'remotion.asset-manifest',
-  description: 'Attaches an image asset spec (description + fallback color) to each scene.',
+  description: 'Attaches brand-accurate cinematic photo direction (problem/solution) to each scene.',
   kind: 'deterministic',
   async run(input, ctx) {
+    const photo = LANE_PHOTO[input.lane] ?? DEFAULT_PHOTO
     const scenes = input.scenes.map((s) => {
-      const desc = s.headline || s.body || s.cta_text || (s.pain_points && s.pain_points[0]) || s.after_state || `${input.lane} ${s.type}`
-      return { ...s, assets: [{ type: 'image', description: `Cinematic ${input.lane} visual: ${desc}`, fallback_color: '#0A1A2F' }] }
+      const direction = PROBLEM_TYPES.has(s.type) ? photo.problem : photo.solution
+      const context = s.headline || s.body || s.cta_text || (s.pain_points && s.pain_points[0]) || s.after_state || s.type
+      return { ...s, assets: [{ type: 'image', description: `${direction} Scene focus: ${context}`, fallback_color: '#0A1A2F' }] }
     })
     ctx.log(`manifested assets for ${scenes.length} scenes`)
     return { ...input, scenes }
