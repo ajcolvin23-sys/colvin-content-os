@@ -2274,6 +2274,8 @@ Return JSON: { draft: string }`;
             lane: targetLane, platform: 'tiktok',
             hook: hook ?? 'Most people have this wrong.',
             transformation, rung_label: rungLabel, cta,
+            icp: (strategy as { icp?: string })?.icp,
+            pain_points: (strategy as { pain_points?: string[] })?.pain_points,
           });
           if (studio.ok && studio.blueprint) {
             const bp = studio.blueprint as Record<string, unknown>;

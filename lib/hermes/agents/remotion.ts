@@ -60,6 +60,8 @@ interface StudioInput {
   transformation?: string
   rung_label?: string
   cta: string
+  icp?: string              // who this is for — pulled from gabriel-config lane_strategy.icp
+  pain_points?: string[]    // specific pains to use in pain_stack scene — from lane_strategy.pain_points
   recentTopics?: string[]   // recent video titles to avoid repeating (topic-history guard)
 }
 interface Scene {
@@ -96,17 +98,21 @@ export const scriptWriterAgent: Agent<StudioInput, ScriptOut> = {
   },
   async run(input, ctx) {
     const voice = VOICE_BY_LANE[input.lane] ?? 'echo'
+    const icpBlock = input.icp ? `\nAUDIENCE — write for this exact person:\n${input.icp}` : ''
+    const painBlock = (input.pain_points && input.pain_points.length)
+      ? `\nPAIN POINTS — use these verbatim in the pain_stack scene (pick 2-3, most emotionally resonant first):\n${input.pain_points.map((p) => `- "${p}"`).join('\n')}`
+      : ''
     const system = `You are the Remotion Script Writer for ${input.lane}. Write a 6-scene short-form video using this EXACT cinematic structure (LOCKED — do not change order or count):
 1 hook — pattern interrupt, use this hook verbatim
-2 pain_stack — 2-3 escalating pain points (array)
+2 pain_stack — 2-3 escalating pain points (array) — use the specific pains listed below, not generic ones
 3 desire — the hope shift toward the outcome
 4 mechanism — 3 solution step cards
-5 transformation — before vs after
+5 transformation — before vs after (use the real before/after from the audience's life, not abstract)
 6 cta — one clear next step
 
 Voice: warm, direct, Indianapolis. NO fabricated stats/clients/ROI — label any outcome "[example]".
 Hook (verbatim scene 1): "${input.hook}"
-Transformation being sold: "${input.transformation ?? ''}". Offer/rung: ${input.rung_label ?? ''}. CTA: "${input.cta}".${(input.recentTopics && input.recentTopics.length) ? `\n\nAVOID repeating these recent video themes (pick a genuinely different angle/topic):\n${input.recentTopics.map((t) => `- ${t}`).join('\n')}` : ''}
+Transformation being sold: "${input.transformation ?? ''}". Offer/rung: ${input.rung_label ?? ''}. CTA: "${input.cta}".${icpBlock}${painBlock}${(input.recentTopics && input.recentTopics.length) ? `\n\nAVOID repeating these recent video themes (pick a genuinely different angle/topic):\n${input.recentTopics.map((t) => `- ${t}`).join('\n')}` : ''}
 
 Return ONLY JSON:
 { "title": string, "voiceover_script": string,
@@ -234,7 +240,11 @@ export const videoAgent: Agent<Record<string, unknown>, Record<string, unknown>>
       scenes: script.scenes,
       voiceover_script: script.voiceover_script,
       voiceover_voice: script.voiceover_voice,
-      music_direction: 'energetic cinematic underscore',
+      music_direction: ({
+        first_keys_indy: 'Emotional cinematic piano with subtle strings — quiet hope building to tearful triumph',
+        music_theory_secrets: 'Soulful gospel-influenced cinematic piano — restrained tension building to warm triumph',
+        colvin_enterprises: 'Confident cinematic hip-hop instrumental — dark tension building to golden crescendo',
+      } as Record<string, string>)[script.lane] ?? 'Cinematic underscore — tension building to resolution',
       music_volume: 0.18,
       captions: script.captions,
       duration_seconds: script.duration_seconds,
