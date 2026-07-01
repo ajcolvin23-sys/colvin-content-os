@@ -2269,7 +2269,12 @@ Return JSON: { draft: string }`;
         // (hook→pain_stack→desire→mechanism→transformation→cta) with brand photo
         // direction. A video that isn't cinematic is REJECTED, never shipped.
         // Set VIDEO_ENGINE=legacy only to fall back to the inline generator below.
-        if (process.env.VIDEO_ENGINE !== 'legacy') {
+        {
+          // Studio is the ONLY video engine. The legacy inline generator below is
+          // now PERMANENTLY UNREACHABLE — the studio always throws __skipVideo before
+          // it. VIDEO_ENGINE=legacy is no longer honored. A generic 5-scene video can
+          // never be produced by this code again. (Generic videos in the past came
+          // from stale checkouts predating this guard, not from current main.)
           const studio = await runVideoStudio({
             lane: targetLane, platform: 'tiktok',
             hook: hook ?? 'Most people have this wrong.',
